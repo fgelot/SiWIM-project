@@ -5,7 +5,7 @@ library(rvest)
 
 #Access infos
 user <- 'fschmidt'
-pwd <- 'yBgVLjS7tj'
+pwd <- 'XXXXXXXX'
 url <- 'https://vpn.siwim.si/siwim-s/login.php'
 values <- list(username = user, password = pwd)
 
