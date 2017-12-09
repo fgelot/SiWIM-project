@@ -1,4 +1,4 @@
-library(data.table)
+ library(data.table)
 
 siwim_data <- fread("Data/SiWIM_data.csv")
 
