@@ -11,6 +11,8 @@ library(questionr) # pour le calcul du Vcramer
 library(FactoMineR) # analyses factorielles  
 library(factoextra) # representation sympa analyses factorielles
 library(missMDA) # imputation des données manquantes
+library(fpc) # pour appeler dbscan
+library(dbscan) # pour appeler hdbscan
 
 # import des données
 don <- read.table("2_Data/2_Retraitees/SiWIM_data_prepared.csv",sep = ",",header = TRUE)
@@ -304,48 +306,71 @@ summary(res_pca)
 #plot.PCA(res_pca, select = "cos2 10")
 
 ##################### Clustering
-# CAH (# Classification ascendante hiérarchique)
 
-# L'idée est de classifier les individus et de caractériser les classes
-# la fonction HCPC réalise ou nécessite une ACP au préalable
+# On réalise un prétraitement par ACP
 res_pca2 <- PCA(don_PCA[,1:7],ncp = 4, scale.unit = TRUE) # on garde 4 dimension sur les 7 représentant 87% de l'information
 summary(res_pca2)
 
-#res_hcpc <- HCPC(res_pca2) # trop d'individus => trop de mémoire demandée, il faut trouver une autre stratégie
+# dbcan
+set.seed(123)
+#db<-fpc::dbscan(res_pca2$ind$coord, eps = 0.2, method = "raw") # attention calcul consommant enormement de memoire
+db <- dbscan::dbscan(res_pca2$ind$coord, eps = 0.2) # calcul beaucoup plus rapide mais ayant l'air de donner un résultat bizarre
+
+# hdbscan (package dbscan)
+#hdb<-dbscan::hdbscan(res_pca2$ind$coord) # attention calcul consommant enormement de memoire
+
+# optics
+
+
+# CAH mixte
+# idée : on réalise un pré-regroupement des individus via kmeans
+# le préregroupement est lpont de départ de la création du dendrogramme de la CAH
+# nous utilisons un nombre de classes important par kmeas, dans lequel sur de l'homogéneité des individus
+# cela permet de réduire la quantité d'individus qui passera de 183928 au nombre de cluster
+# afin de ne pas perdre la possibilité d'interpréter, nous relancons ensuite une ACP pondérée par le nombre d'individus de chaque classe
+
+set.seed(123)
+obj_kmeans <- kmeans(res_pca2$ind$coord, centers = 100, nstart = 10, iter.max = 40) 
+# nstart : execution de plusieurs segmentation en gardant la meilleure
+# iter.max : le nombre d'itération maximale pour que l'algo converge
+print(obj_kmeans) # (between_SS / total_SS =  93.0 %) == proportion d'intertie expliquée par la partition avec 100
+obj_kmeans$iter # donne le nombre d'iteration utilisees pour converger (si convergence)
+
+obj_kmeans_df <- cbind.data.frame(obj_kmeans$size,obj_kmeans$centers)
+colnames(obj_kmeans_df)[1] <- "effectifs_classe"
+
+# on réalise de nouveau une acp en prenant bien soin de ne pas centrer réduire et de conserver toutes les composantes
+res_pca3 <- PCA(obj_kmeans_df[,2:5],row.w = obj_kmeans_df[,1],scale.unit = FALSE, ncp = Inf)
+
+# a partir du centre des classes et des effectifs on réalise un arbre hiérarchique
+# l'arbre correspond ainsi au haut de l'arbre hiérarchique que l'on aurait obtenu à partir de tous les individus (le bas est perdu mais seul le haut de l'arbre est utile pour l'interprétation métier)
+res_hcpc <- HCPC(res_pca3$ind$coord,graph=TRUE, order = FALSE, iter.max = 20) # IMPORTANT: order=FALSE pour conserver l'ordre des individus dans le fichier
+# attention buggé avec la fonction HCPC de factominer qui déconne cf internet
+
+# autre option avec hclust qui remplace HCPC pour la CAH
+# pas de bol, hclust n'est pas compatible avec R 3.3.2 !!!
+
+# CAH mixte directement avec HCPC (si cette fonction marchait on ferait) # attention à bien garder l'ordre == order = FALSE
+res_hcpc <- HCPC(res_pca2,graph=TRUE, kk=100, order = FALSE, iter.max = 20)
+
+# acp + kmeans 
 
 # Kmeans 
 # l'algorithme de kmeans nécessite de fixer à priori le nombre de classes, et l'initialisation au hazard peut donner des résultats assez variables
 # nous pouvons faire varier le nombre de classes et observer le résultat, en optimisant le rapport d'inertie
 # nous pouvons lancer Kmeans sur un grand nombre de classes (ex 100) chaque classe 
   
-# idée 
-# on realise Kmeans sur un grand nombre de classes (ex 100), ceci assure que le regroupement d'individus globalement proches 
-groupe_kmeans <- kmeans(res_pca2$ind$coord, centers = 100, nstart = 10, iter.max = 30) 
-# nstart : execution de plusieurs segmentation en gardant la meilleure
-# iter.max : le nombre d'itération maximale pour que l'algo converge
-
-print(groupe_kmeans) #  (between_SS / total_SS =  93.0 %) == proportion d'intertie expliquée par la partition avec 100
-
-groupe_kmeans$iter # donne le nombre d'iteration utilisees pour convergees (si convergence)
-
-# a partir du centre des classes et des effectifs on réalise un arbre hiérarchique
-# l'arbre correspond ainsi au haut de l'arbre hiérarchique que l'on aurait obtenu à partir de tous les individus (le bas est perdu mais seul le haut de l'arbre est utile pour l'interprétation métier)
-# ceci semble automatisé avec l'argument "kk" de hcpc
-
-# attention calcul tres long, envisager à le paralléliser
-res_hcpc <- HCPC(res_pca2$ind$coord,graph=TRUE, kk=10, order = FALSE, iter.max = 20) # IMPORTANT: order=FALSE pour conserver l'ordre des individus dans le fichier
-# https://groups.google.com/forum/#!topic/factominer-users/lnCW9DAE5z0
 
 # evaluation de la proportion expliquée 
 inertie_expl <- rep(0,times=10)
 for (k in 2:10){
-  clus <-kmeans(res_pca2$ind$coord, centers = k, nstart = 5, iter.max = 20)
+  clus <-kmeans(res_pca2$ind$coord, centers = k, nstart = 10, iter.max = 40)
   inertie_expl[k] <- clus$betweenss / clus$totss
 } 
 
 plot(1:10,inertie_expl, type = "b", xlab = "Nombre de groupes", ylab = "% d'inertie expliquée par le modèle" )
 
-# Conclusions 3 ou 4 classes pourraient être choisies
+# à partir de 4 classes le rajout d'un groupe supplémentaire n'augmente pas significativement la part d'inertie expliquée par la partition
 
 # 2e methode - indice de Calinski Harabasz - utilisation du package fpc
 library("fpc")
@@ -355,21 +380,51 @@ sol_kmeans <- kmeansruns(res_pca2$ind$coord,krange = 2:10, criterion = "ch")
 
 # graphique 
 plot(1:10, sol_kmeans$crit,type = "b", xlab = "Nombre de groupes", ylab = "Silhouette")
+# la solution a 2 classes maximise ici le critère 
 
-# on lance un kmeans avec le nombre de classes choisies
-res_kmeans3 <- kmeans(res_pca2$ind$coord, centers = 3, nstart = 10, iter.max = 50)
 
-# représentation des classes sur le plan factoriel
-axes_acp_groupes <- cbind(res_kmeans3$cluster, res_pca2$ind$coord) 
-colnames(axes_acp_groupes)[1] <- "cluster"
-table(res_kmeans3$cluster)
+# on lance plusieurs kmeans
+res_kmeans2 <- kmeans(res_pca2$ind$coord, centers = 2, nstart = 10, iter.max = 40) # 31.7 % d'inertie expliquée
+res_kmeans3 <- kmeans(res_pca2$ind$coord, centers = 3, nstart = 10, iter.max = 40) # 46.1 % (+15) d'inertie expliquée
+res_kmeans4 <- kmeans(res_pca2$ind$coord, centers = 4, nstart = 10, iter.max = 40) # 54.9 % (+13) d'inertie expliquée
+res_kmeans5 <- kmeans(res_pca2$ind$coord, centers = 5, nstart = 10, iter.max = 40) # 62,5 % (+8) d'inertie expliquée
+res_kmeans6 <- kmeans(res_pca2$ind$coord, centers = 6, nstart = 10, iter.max = 40) # 67.2 % (+5) d'inertie expliquée
+res_kmeans7 <- kmeans(res_pca2$ind$coord, centers = 7, nstart = 10, iter.max = 40) # 71.2 % (+4) d'inertie expliquée
+res_kmeans8 <- kmeans(res_pca2$ind$coord, centers = 8, nstart = 10, iter.max = 40) # 73.2 % (+2)d'inertie expliquée
+
+# le partitionnement en deux groupes est celui avec le plus grand saut.
+# le bon "rapport qualité prix" semble etre le partitionnement à 4 groupes
+# quoi qu'il en soit, il faut à présent caractériser et garder le profil de classes correspondant le plus au métier
+
+
+# représentation des 2 et 4 classes sur le plan factoriel
+axes_acp_2groupes <- cbind.data.frame(as.factor(res_kmeans2$cluster), res_pca2$ind$coord) 
+colnames(axes_acp_2groupes)[1] <- "cluster"
+table(res_kmeans2$cluster)
+
+axes_acp_4groupes <- cbind.data.frame(as.factor(res_kmeans4$cluster), res_pca2$ind$coord) 
+colnames(axes_acp_4groupes)[1] <- "cluster"
+table(res_kmeans4$cluster)
+
+# nuage initial
+ggplot((as.data.frame(res_pca2$ind$coord[,1], res_pca2$ind$coord[,2])), aes(res_pca2$ind$coord[,1], res_pca2$ind$coord[,2])) + geom_point()+ ggtitle("projection des individus en deux groupes sur le plan principal")
+
+# représentation des 2 classes sur le premier plan principal
+ggplot(axes_acp_2groupes, aes(Dim.1, Dim.2, color = cluster)) + geom_point() + ggtitle("projection des individus en deux groupes sur le plan principal")
+
+# représentation des deux classes sur le premier plan principal
+ggplot(axes_acp_4groupes, aes(Dim.1, Dim.2, color = cluster)) + geom_point() + ggtitle("projection des individus en deux groupes sur le plan principal")
+
 
 # interprétation des classes
-catdes(res_kmeans3)
+# A faire en utilisant le centre des classes!
 
 # Améliorations
 # penser a tester factoinvestigate qui réalise des rapports
 
-
-
+# lien web sur factominer et CAH mixte
+# HCPC : http://forums.cirad.fr/logiciel-R/viewtopic.php?t=3132
+# HCPC : https://groups.google.com/forum/#!topic/factominer-users/lnCW9DAE5z0
+# CAH mixte : http://chirouble.univ-lyon2.fr/~ricco/tanagra/fichiers/fr_Tanagra_CAH_Mixte_Gros_Volumes.pdf
+# kmeans : https://eric.univ-lyon2.fr/~ricco/cours/didacticiels/R/cah_kmeans_avec_r.pdf
 
