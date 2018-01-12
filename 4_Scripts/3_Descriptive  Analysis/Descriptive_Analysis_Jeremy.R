@@ -28,7 +28,7 @@ don[, Jour2 := format(as.Date(don$Date), format = "%A")]
 don[, Heure := str_sub(Horaire, 1, 2)]
 
 # création du champs Anomalie (1 : présence Anomalie, 0 : absence Anomalie)
-# [idee] Peut on separer ce qui est une anomalie de relever (bruit) d'une anomalie du poids lourd (ex : surchargé)
+# [idee] Peut on separer ce qui est une anomalie du au relevé du système (bruit) d'une anomalie du poids lourd (ex : surchargé)
 #don[Warning_flags != "00000000",Anomalie := 1]
 don[,Anomalie := 0][Warning_flags != "00000000",Anomalie := 1]
 
@@ -60,8 +60,7 @@ summary(varquanti)
 # 9 valeurs manquantes sur les groupes d'essieux
 # Conclusion : la qualité du jeu de donnée est bonne du point de vue des valeurs manquantes
 
-library(Hmisc)
-library(questionr)
+
 
 ####################### Analyse unidimensionnelle : variable qualitative
 
@@ -78,7 +77,6 @@ freq(varquali$Heure, sort = "dec")
 # Les camions semblent moins circuler de 20h à 5h (donc la nuit) qu'en journée
 
 # voie 
-hist.data.frame(varquali[,"Lane"]) 
 freq(varquali$Lane) # Lors de la capture des données 91% des camions ont roulé à droite. Les 9% ayant roulé à gauche étaient t ils en dépassement ?
 
 # Warning flags
@@ -143,7 +141,7 @@ boxplot(varquanti$MGV) # plusieurs valeurs semblent aberrantes. A partir de quel
 # Croisement heure  et jour de passage
 table(varquali$Jour2,varquali$Heure)
 plot(table(varquali$Jour2,varquali$Heure))
-# en résumé : les camions circulent peu samedi et dimanche et nettement moins de nuit
+# en résumé : les camions circulent peu le Samedi et le Dimanche et nettement moins la nuit
 
 # liaisons entre variables qualitatives (calcul du V de Cramer)
 varquali2 <- varquali[,c("Mois2","Jour2","Heure","Warning_flags","Lane","Subclass_ID","Axle_groups","Anomalie")]
@@ -159,9 +157,9 @@ rownames(cramer) <- colnames(varquali2)
 
 corrplot(cramer, method="number")
 
-# [Analyse] il semble y avoir un lien entre la voie (lane) et le mois de circulation.Attention car les données ont été récupérées sur 5 mois.
+# [Analyse] il semble y avoir un lien entre la voie (lane) et le mois de circulation. Attention car les données ont été récupérées sur 5 mois.
 # Même chose pour l'heure mais dans une moindre mesure
-# Vcramer est important entre SubClasss_ID et Axle_Group ce qui parait logique
+# Le Vcramer est important entre SubClasss_ID et Axle_Group ce qui parait logique
 # Il semble également y avoir un lien entre l'anomalie (Warning flag et le fait de rouler a gauche ou a droite)
 # Anomalie est liée parfaitement avec Warning flag (ce qui etait attendu), et fortement avec "SubClass ID" et "Axle_Group"
 
@@ -175,7 +173,7 @@ corr <- cor(varquanti2)
 corrplot(corr, method="number")
 
 # Analyse : 
-#La distance totale entre les essieux est corrélée linéairement au nombre d'essieux
+# La distance totale entre les essieux est corrélée linéairement au nombre d'essieux
 # Une corrélation négative, plutot forte, entre vitesse et masse (plus le poids lourd est massique, moins il va vite)
 # Une corrélation entre le nombre d'essieux et la masse du camion 
 # Une faible corrélation entre masse et nombre d'essieux et entre vitesse et nombre d'essieux (corrélation négative)
@@ -183,7 +181,9 @@ corrplot(corr, method="number")
 
 # liaisons quanti / quali (anova / kruskall wallis)
 
+# Jeu de données final recombinant var quanti et quali
 don2 = cbind(varquali2,varquanti2)
+
 # Température / Ano
 bp1 <- ggplot(don2, aes(don2$Anomalie, y=don2$T, group=don2$Anomalie)) + 
   geom_boxplot(aes(fill=don2$Anomalie))
@@ -208,7 +208,7 @@ bp4
 ###################### Analyses Factorielles
 
 # Analyse en composantes principales sur variables quantitatives 
-res_pca <- PCA(varquanti2[,-1], scale.unit = TRUE, ncp = 5)
+res_pca <- PCA(don2[,10:16], scale.unit = TRUE, ncp = 5)
 summary(res_pca)
 #plot(res_pca)
 # les 7 premières composantes principales capturent 100% del'inertie
@@ -221,15 +221,16 @@ summary(res_pca)
 # [ATTENTION] : tres couteux en temps de calcul => reflechir à l'opportunité d'intégrer des variables qualitatives
 
 # Analyse factorielle des données mixtes
+# permet de réaliser une analyse factorielle sur var quali et quanti
 
 ##################### Clustering
+# CAH (# Classification ascendante hiérarchique)
 
 # Kmeans
-
-# Kmeans sur les 5 premières composantes principales (donc clustering sur la base des variables qualitatives)
+# Kmeans sur les 5 premières composantes principales (donc clustering sur la base des variables quantitatives)
 groupe_kmeans <- kmeans (res_pca$ind$coord, centers = 7, nstart = 4 )
 print(groupe_kmeans)
-# Classification ascendante hiérarchique
+
 
 
 
