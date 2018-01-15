@@ -1,11 +1,16 @@
 ###########
+install.packages("rvest")
+
 #Loading packages
 library('httr')
 library(rvest)
+library(stringr)
+
+require(stats)
 
 #Access infos
 user <- 'fschmidt'
-pwd <- 'XXXXXXXX'
+pwd <- 'yBgVLjS7tj'
 url <- 'https://vpn.siwim.si/siwim-s/login.php'
 values <- list(username = user, password = pwd)
 
@@ -59,7 +64,7 @@ for (line in records) {
 
 maxN
 
-### Build a new data frame woth cleaned columns
+### Build a new data frame with cleaned columns
 
 axles_load <- paste("W", 1:maxN, sep = "")
 
