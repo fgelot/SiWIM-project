@@ -1,5 +1,9 @@
+setwd("~/GitHub/SiWIM-project/4_Scripts/1_Web scraping") # Renseigner son repertoire de travail
+
 ###########
+install.packages("httr")
 install.packages("rvest")
+install.packages("stringi")
 
 #Loading packages
 library('httr')
@@ -28,12 +32,14 @@ url_list <- html %>%
   html_nodes("a") %>%
   html_attr("href")
 
+max_url <- length(url_list)
 
-
-file_url_list <- url_list[seq(4, 488, by = 4)]
+file_url_list <- url_list[seq(4, max_url, by = 4)]
 
 url_start <- "https://vpn.siwim.si/siwim-s/"
 html_global <- ""
+
+start_time <- Sys.time()
 
 for (url in file_url_list) {
   #Download info
@@ -122,3 +128,6 @@ head(records.df)
 dim(records.df)
 
 write.csv(records.df, file = "SiWIM_data.csv")
+
+end_time <- Sys.time()
+end_time - start_time
