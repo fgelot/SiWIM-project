@@ -1,11 +1,17 @@
+setwd("~/GitHub/SiWIM-project/4_Scripts/1_Web scraping") # Renseigner son repertoire de travail
+
 ###########
+install.packages("httr")
+install.packages("rvest")
+install.packages("stringi")
+install.packages("data.table")
+
 #Loading packages
 library('httr')
 library(rvest)
 library(stringi)
 library(data.table)
-library(parallel)
-
+library(parallel
 
 #Access infos
 user <- 'fschmidt'
@@ -13,10 +19,9 @@ pwd <- 'yBgVLjS7tj'
 url <- 'https://vpn.siwim.si/siwim-s/login.php'
 values <- list(username = user, password = pwd)
 
-
 start_date <- as.Date("2017-07-01")
 
-end_date <- as.Date("2018-01-15")
+end_date <- as.Date("2018-01-24")
 
 #Login
 POST(url, body = values)
@@ -34,11 +39,14 @@ url_list <- html %>%
 
 max_url <- length(url_list)
 
-file_url_list <- url_list[seq(4, max_url, by = 4)]
+#file_url_list <- url_list[seq(4, max_url, by = 4)] # sens chronologique inverse
+file_url_list <- url_list[seq(max_url, 4, by = -4)] # sens chronologique
 
 url_start <- "https://vpn.siwim.si/siwim-s/"
 html_global <- ""
 nb_dates <- 0
+
+start_time <- Sys.time()
 
 for (url in file_url_list) {
   #check date in scope
@@ -146,4 +154,8 @@ dim(records.dt)
 file_name <- paste("SiWIM_data_", start_date, "_to_", end_date, ".csv", sep= "")
 
 
-write.csv(records.dt, file = paste("2_Data/1_Sources/",file_name, sep = ""))
+write.csv(records.dt, file = paste("../../2_Data/1_Sources/",file_name, sep = ""))
+
+end_time <- Sys.time()
+end_time - start_time
+
