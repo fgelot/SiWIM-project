@@ -1,0 +1,310 @@
+---
+title: "Découverte du jeu de données du projet SIWIM"
+output: 
+  html_document:
+    df_print: paged
+---
+
+```{r "setup", include=FALSE}
+# Configuration locale du chemin du projet SIWIM :
+knitr::opts_knit$set(root.dir = normalizePath("/home/jeremy/Bureau/Certificat Data Scientist ENSAE/SiWIM-project")) 
+```
+
+# Feature engineering
+
+Nous allons dans cette section partir des données brutes afin de les retravailler en recodant certaines variables
+
+```{r}
+# chargement des librairies 
+
+library(data.table)
+library(stringr) # manipulation de chaine de caracteres
+library(missMDA) # imputation des données manquantes
+library(questionr) # calcul Vcramer et des fréquences
+library(ggplot2)
+
+```
+
+```{r}
+# Chargement des données brutes, récupérées par scraping et reformatées
+siwim_data <- fread("2_Data/2_Retraitees/SiWIM_data_formated.csv")
+
+```
+
+Nous recodons / renommons certaines variables qualitatives :
+
+```{r}
+# Suppression de variables inutiles
+siwim_data[, c("Stage_trace", "Offset", "Impact_factor") := NULL]
+
+# Conversion en factor de la variable Site_ID
+siwim_data[, Site_ID := as.factor(Site_ID)]
+
+# Conversion en factor de la variable Warning_flags
+siwim_data[, Warning_flags := as.factor(Warning_flags)]
+
+# Recodification de la variable lane (0 = droite, 1 = gauche)
+siwim_data[, Lane := factor(siwim_data$Lane, labels = c("droite", "gauche"))]
+
+# Conversion en factor de la variable Subclass_ID
+siwim_data[, Subclass_ID := factor(siwim_data$Subclass_ID)]
+
+# Conversion en factor de la variable Axle_groups
+siwim_data[, Axle_groups := factor(siwim_data$Axle_groups)]
+
+# Renommage et conversion en factor de la variable N (nombre d'axes)
+siwim_data[, Nb_axles := factor(siwim_data$N)]
+```
+
+De nouvelles variables de date sont créées à partir de la variable `timestamp`:
+
+```{r}
+# Creation de variables depuis timestamp au format POSIXct :
+siwim_data[, Date    := as.POSIXct(substr(siwim_data$Timestamp,1,10), format = '%Y-%m-%d')]
+siwim_data[, Horaire := substr(siwim_data$Timestamp,12,19)]
+siwim_data[, Timestamp := as.POSIXct(substr(siwim_data$Timestamp,1,19), format = '%Y-%m-%d %H:%M:%S')]
+
+# Création d'une variable temporelle quantitative depuis le 1er Janvier 2017
+
+siwim_data[, Time_num := as.numeric((siwim_data$Timestamp - as.POSIXct("2017-01-01 00:00:00", format = '%Y-%m-%d %H:%M:%S'))/360)]
+
+# Creation de variables temporelles de type factor
+siwim_data[, Annee := as.factor(strftime(siwim_data$Date, format = "%Y"))]
+siwim_data[, Mois_num := as.factor(strftime(siwim_data$Date, format = "%m"))]
+siwim_data[, Mois_annee := as.factor(strftime(siwim_data$Date, format = "%B"))]
+siwim_data[, Jour_num := as.factor(strftime(siwim_data$Date, format = "%d"))]
+siwim_data[, Jour_semaine := as.factor(strftime(siwim_data$Date, format = "%A"))]
+siwim_data[, Heure := as.factor(str_sub(Horaire, 1, 2))]
+```
+
+Creation de la variable qualitative `Anomalie` :
+
+```{r}
+siwim_data[,Anomalie := "N"][Warning_flags != "00000000",Anomalie := "Y"]
+
+# Transformation en factor
+siwim_data[, Anomalie := factor(siwim_data$Anomalie)]
+```
+
+Plusieurs variables ont des unités anglo-saxonnes, nous les recalculons dans des unités européennes :
+
+```{r}
+
+# Passage de la vitesse en km/h
+siwim_data[, Vitesse := siwim_data$v * (36/10)]
+
+# Passage du poids en tonnes
+siwim_data[, MGV := siwim_data$WGV / 9.81]
+
+# Passage du poids de chaque essieu en tonnes
+maxN <- 16
+axles_load <- paste("W", 1:maxN, sep = "")
+axles_mass <- paste("M", 1:maxN, sep = "")
+axles_load
+siwim_data[, (axles_mass) := lapply(axles_load, function(x){get(x)/9.81})]
+```
+
+Certaines variables désormais inutiles sont retirées :
+```{r}
+# Suppression de la variable index V1 avant écriture des données dans le .csv
+siwim_data[, V1 := NULL]
+
+# Suppression des variables d'origine codées dans des unités anglo-saxonnes
+siwim_data [, c("v","WGV", "W1","W2","W3","W4","W5","W6","W7","W8","W9","W10",
+         "W11","W12","W13","W14","W15","W16") := NULL]
+```
+
+# Résumés et valeur manquantes
+
+Le jeu de données contient 54 variables et environ 184 000 lignes :
+
+```{r}
+dim(siwim_data)
+```
+
+Chaque ligne représente les valeurs des variables pour un camion capturé par le système de pesage par poids du Pont de Normandie.
+
+Il est important de rappeler que le système comporte sa propre fiabilité et est possiblement amené à capturer du bruit ou à dysfonctionner.
+
+Nous notons ici la présence de nombreuses valeur manquantes ou de valeur aberrantes lorsque nous analysons par exemple les minimum ou les maximum de certaines variables.
+
+
+```{r}
+summary(siwim_data)
+```
+
+Nous allons créer deux dataframe :
+
+- `varquali` contiendra les variables qualitatives
+- `varquanti` contiendra les variables quantitatives
+
+```{r}
+varquanti <- siwim_data[, lapply(siwim_data, is.numeric) == TRUE, with = FALSE]
+varquali <- siwim_data[,lapply(siwim_data,is.numeric) == FALSE, with = FALSE]
+```
+
+Regardons à présent le résumé concernant les variables quantitatives :
+
+```{r}
+summary(varquanti)
+```
+
+Les variables `Ai` représentant la distance entre chaque essieu comportent de nombreuses valeur manquantes. Le nombre d'essieu constaté dans le jeu données maximum etant de 16 (valeur non réaliste), le tableau comporte ainsi 16 valeur de `Ai`.
+
+Même raisonnement pour la masse sur chaque essieu où 16 variables `Mi` sont présentes dans le jeu de données et comportent des valeurs manquantes.
+
+Le nombre de valeurs manquantes n'étant pas négligeable, il faudra les traiter comme nous le verrons ci-après.
+
+```{r}
+summary(varquali)
+```
+Pour les variables qualitatives, seule la variable `Axles_groups` comportent des valeurs manquantes (9)
+
+En résumé : la qualité du jeu de donnée est bonne du point de vue des valeurs manquantes.
+
+# Analyse unidimensionnelle des variables qualitatives
+
+Nous analysons les fréquences des modalités de chaque variable qualitative.
+
+```{r}
+# Mois de circulation
+freq(varquali[,.(Mois_annee)], cum = TRUE, total = TRUE, sort = "dec") 
+```
+
+Nous remarquons que les données ici représentées le sont sur un espace de temps limité. 
+On note un léger pic de circulation l'Eté.
+
+```{r}
+# jour de circulation
+freq(varquali[,.(Jour_semaine)], cum = TRUE, total = TRUE, sort = "dec")
+```
+Les jours de la semaines sont les plus circulés par les poids lourds.
+Les moins circulés sont le week-end, ce qui est assez net.
+
+Pour rappel En France, à l’exclusion des véhicules spécialisés et des matériels et engins agricoles, les camions n’ont pas le droit de circuler du samedi 22 heures au dimanche 22 heures. Cette interdiction générale s’applique également les veilles de jours fériés à partir de 22 heures jusqu’à 22 heures le lendemain.
+
+
+```{r}
+# heure de circulation
+freq(varquali[,.(Heure)], cum = TRUE, total = TRUE, sort = "dec")
+```
+
+Les camions semblent moins circuler de 20h à 5h (donc la nuit) qu'en journée. En effet, environ 90 % des passages ont lieu entre 6h et 19h.
+
+
+```{r}
+# voie 
+freq(varquali[,.(Lane)], cum = TRUE, total = TRUE, sort = "dec") 
+```
+
+Lors de la capture des données 91% des camions ont roulé à droite. Les 9% ayant roulé à gauche réalisaient-ils un dépassement ?
+
+
+```{r}
+freq(varquali[,.(Anomalie)], cum = TRUE, total = TRUE, sort = "dec") 
+```
+
+29 % des passages ont été taggé en anomalie. 
+
+Analysons le détail, en excluant la modalité `00000000` signifiant qu'il n'y a pas d'anomalie :
+
+```{r}
+freq(varquali[,.(Warning_flags)], exclude = c("00000000"), cum = TRUE, total = TRUE, sort = "dec") 
+```
+
+Les anomalies les plus fréquentes sont donc :
+
+- `00008000` : vehicle reconstructed
+- `00800000` : vehicle overloaded
+- `00000001` : multiple truck presence
+- `00000080` : negative axle loads or WGV
+- `00000081` : ?
+- `00000200` : vehicle reclassified
+
+
+```{r}
+# Subclass_ID : classification réalisée par le système de pesage
+freq(varquali[,.(Subclass_ID)], cum = TRUE, total = TRUE, sort = "dec")
+```
+Les deux classifications les plus fréquentes réalisées par le systèmes sont 113 et 61 (50% à elles deux)
+
+
+```{r}
+# Groupe d'essieux (constatés)
+freq(varquali[,.(Axle_groups)], cum = TRUE, total = TRUE, sort = "dec")
+```
+Seul 113 ressort comme sur la classification réalisée par le système.
+
+[Idée] : il pourrait etre intéressant de considérer comme un label (Y) le groupe d'essieux, et de réaliser une classification en la comparant à celle réalisée pour le système (Subclass Id) 
+
+
+
+```{r}
+# Nombre d'essieux
+freq(varquali[,.(Nb_axles)], cum = TRUE, total = TRUE, sort = "dec")
+```
+
+95 %  des camions ont 2,3, 4 ou 5 essieux.
+Nous observons des valeurs allant jusqu' à 16 essieux.
+Nous considérons comme aberrant le fait qu'un camion ait plus de 8 essieux.
+
+
+# Analyse unidimensionnelle des variables quantitatives
+
+Nous allons étudier la distribution et la distribution des variables quantitatives à l'aide de boites à moustache (boxplot)
+
+
+
+La variable quantitative `N` représente le nombre d'essieux, à l'instar de `Nb_Axles` qui est qualitative
+
+```{r}
+# Nombre d'essieux
+ggplot(varquanti,aes("", y = N)) + geom_boxplot()
+
+```
+la médiane du nombre d'essieux est 5. On observe des valeurs aberrantes car on considère qu'un nombre d'essieux supérieur à 8 est anormal.
+
+
+```{r}
+# Distance totale entre les essieux les plus éloignés
+ggplot(varquanti,aes("", y = total_axle_dist)) + geom_boxplot()
+
+```
+
+`Total_axle_dist` exprime la distance total entre les essieux les plus éloignés du camion. Elle donne une approximation de la taille (une taille minimale) du camion.
+
+Nous constatons que de nombreuses valeur sont aberrantes car cette distance va jusqu'à 80 mètres !
+
+En France, la longueur maximale autorisée est autour de 18.50 mètres, nous considérons donc qu'au-delà de 20 mètres la valeur est aberrante. 
+
+
+
+
+```{r}
+# Temperature utilisée par la compensation
+ggplot(varquanti,aes("", y = T)) + geom_boxplot()
+
+```
+
+Nous constatons des valeurs clairement aberrantes, situées à -273 degrés !
+
+
+```{r}
+varquanti[T == -273,.N]
+```
+
+Ces valeurs sont au nombre de 2014. Il faudra donc les traiter.
+L'observation des indices semblent montrer une continuité dans la captation de cette valeur aberrante.
+
+```{r}
+# Vitesse
+ggplot(varquanti,aes("", y = Vitesse)) + geom_boxplot()
+```
+
+
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+

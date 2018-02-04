@@ -9,6 +9,12 @@ siwim_data <- fread("2_Data/2_Retraitees/SiWIM_data_formated.csv")
 # Delete some useless features
 siwim_data[, c("Stage_trace", "Offset", "Impact_factor") := NULL]
 
+# Refactor Site_ID
+siwim_data[, Site_ID := as.factor(Site_ID)]
+
+# Refactor Warning_flags
+siwim_data[, Warning_flags := as.factor(Warning_flags)]
+
 # Refactor the lane (0 = droite, 1 = gauche)
 siwim_data[, Lane := factor(siwim_data$Lane, labels = c("droite", "gauche"))]
 
@@ -42,15 +48,15 @@ siwim_data[, Timestamp := as.POSIXct(substr(siwim_data$Timestamp,1,19), format =
 
 siwim_data[, Time_num := as.numeric((siwim_data$Timestamp - as.POSIXct("2017-01-01 00:00:00", format = '%Y-%m-%d %H:%M:%S'))/360)]
 
-# Create time series groups
-siwim_data[, Annee := format(as.Date(siwim_data$Date), format = "%Y")]
-siwim_data[, Mois_num := format(as.Date(siwim_data$Date), format = "%m")]
-siwim_data[, Mois_annee := format(as.Date(siwim_data$Date), format = "%B")]
-siwim_data[, Jour_num := format(as.Date(siwim_data$Date), format = "%d")]
-siwim_data[, Jour_semaine := format(as.Date(siwim_data$Date), format = "%A")]
-siwim_data[, Heure := str_sub(Horaire, 1, 2)]
+# Create and and refactor time series groups 
+siwim_data[, Annee := as.factor(strftime(siwim_data$Date, format = "%Y"))]
+siwim_data[, Mois_num := as.factor(strftime(siwim_data$Date, format = "%m"))]
+siwim_data[, Mois_annee := as.factor(strftime(siwim_data$Date, format = "%B"))]
+siwim_data[, Jour_num := as.factor(strftime(siwim_data$Date, format = "%d"))]
+siwim_data[, Jour_semaine := as.factor(strftime(siwim_data$Date, format = "%A"))]
+siwim_data[, Heure := as.factor(str_sub(Horaire, 1, 2))]
 
-#Create a feature for anomalie
+# Create a feature for anomalie
 siwim_data[,Anomalie := "N"][Warning_flags != "00000000",Anomalie := "Y"]
 
 # Refactor anomalie
@@ -118,27 +124,27 @@ siwim_data[Vitesse > 130]
 siwim_data[MGV > 70, .N]
 siwim_data[MGV > 70]
 
-###################### Gestion des données aberrantes
+###################### Gestion des donn?es aberrantes
 
-# On travaille sur le tableau simplifié quantitatif
-# Idée générale : attribuer aux donnÃ©es aberrantes (dont nous sommes surs qu'elles soient fausses) un valeur "NA"
+# On travaille sur le tableau simplifi? quantitatif
+# Id?e g?n?rale : attribuer aux donnÃ©es aberrantes (dont nous sommes surs qu'elles soient fausses) un valeur "NA"
 # puis reconstituer leur valeur grasse aux techniques d'imputation du package "missMDA"
 
-# on considère comme valeur anormale au dessus de 8 essieux (ici 2843 valeurs dans ce cas)
+# on consid?re comme valeur anormale au dessus de 8 essieux (ici 2843 valeurs dans ce cas)
 siwim_data[siwim_data$N > 8, N := NA]
 siwim_data[is.na(siwim_data$N), Nb_axles := NA]
 
-# on considère comme valeur anormale une distance totale entre les axes supÃ©rieure Ã  20 m(ici 5102 valeurs dans ce cas)
+# on consid?re comme valeur anormale une distance totale entre les axes supÃ©rieure Ã  20 m(ici 5102 valeurs dans ce cas)
 siwim_data[total_axle_dist > 20, total_axle_dist := NA]
 
-# on considère comme valeur anormale les tempÃ©ratures nÃ©gatives < Ã  -10Â°C (dans le jeu de donnÃ©es seule -273 est prÃ©sente comme valeur nÃ©gative, 2014 valeurs dans ce cas)
+# on consid?re comme valeur anormale les tempÃ©ratures nÃ©gatives < Ã  -10Â°C (dans le jeu de donnÃ©es seule -273 est prÃ©sente comme valeur nÃ©gative, 2014 valeurs dans ce cas)
 siwim_data[T < -20, T := NA]
 
-# # on considère comme valeur anormale la vitesse d'un camion > 130 km/h (19 valeurs dans ce cas)
+# # on consid?re comme valeur anormale la vitesse d'un camion > 130 km/h (19 valeurs dans ce cas)
 # index_aberrant_Vitesse <- which(siwim_data[,"Vitesse"] > 130)
 # siwim_data[index_aberrant_Vitesse,"Vitesse"] <- NA
 # 
-# # on considère comme valeur anormale la masse d'un camion > 70 T (22 valeurs dans ce cas)
+# # on consid?re comme valeur anormale la masse d'un camion > 70 T (22 valeurs dans ce cas)
 # index_aberrant_MGV <- which(siwim_data[,"MGV"] > 70)
 # siwim_data[index_aberrant_MGV,"MGV"] <- NA
 
@@ -170,14 +176,14 @@ siwim_data_imput <- siwim_data[, c( "Lane", "Nb_axles", "Anomalie", "total_axle_
 #                                     "A3", "A4", "A5", "A6", "A7",                 
 #                                     "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8")]
 
-# on cherche à présent à imputer les données manquantes en utilisant l'AFM
+# on cherche ? pr?sent ? imputer les donn?es manquantes en utilisant l'AFM
 colnames(siwim_data_imput)
 colorder <- c( "Lane", "Nb_axles", "Anomalie", "total_axle_dist", "T", 
                "Reduced_chi_squared", "Time_num", "Vitesse", "MGV")
 
 siwim_data_imput <- setcolorder(siwim_data_imput, colorder)
 
-#Estimation du nombre d'axes planté (problème mémoire)
+#Estimation du nombre d'axes plant? (probl?me m?moire)
 nb_axe_imput <- estim_ncpFAMD(siwim_data_imput)
 
 
