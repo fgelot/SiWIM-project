@@ -264,6 +264,11 @@ ggplot(varquanti,aes("", y = N)) + geom_boxplot()
 ```
 la médiane du nombre d'essieux est 5. On observe des valeurs aberrantes car on considère qu'un nombre d'essieux supérieur à 8 est anormal.
 
+```{r}
+# Nombre de camions ayant plus de 8 essieux
+siwim_data[N > 8, .N]
+```
+
 
 ```{r}
 # Distance totale entre les essieux les plus éloignés
@@ -273,7 +278,12 @@ ggplot(varquanti,aes("", y = total_axle_dist)) + geom_boxplot()
 
 `Total_axle_dist` exprime la distance total entre les essieux les plus éloignés du camion. Elle donne une approximation de la taille (une taille minimale) du camion.
 
-Nous constatons que de nombreuses valeur sont aberrantes car cette distance va jusqu'à 80 mètres !
+Nous constatons que de nombreuses valeur sont aberrantes car cette distance va jusqu'à 80 mètres :
+
+```{r}
+# Nombre de camions avec une distance totale entre essieux supérieure à 20 m
+siwim_data[total_axle_dist > 20, .N]
+```
 
 En France, la longueur maximale autorisée est autour de 18.50 mètres, nous considérons donc qu'au-delà de 20 mètres la valeur est aberrante. 
 
@@ -286,7 +296,12 @@ ggplot(varquanti,aes("", y = T)) + geom_boxplot()
 
 ```
 
-Nous constatons des valeurs clairement aberrantes, situées à -273 degrés !
+```{r}
+# Enregistrement de température inférieur à -20 degrés
+siwim_data[T < -20, .N]
+```
+
+Nous constatons des valeurs clairement aberrantes, toutes situées à -273 degrés.
 
 
 ```{r}
@@ -300,6 +315,96 @@ L'observation des indices semblent montrer une continuité dans la captation de 
 # Vitesse
 ggplot(varquanti,aes("", y = Vitesse)) + geom_boxplot()
 ```
+
+La vitesse mediane est autour de 70km/h.
+Plusieurs vitesses apparaissent excessives (peut on rouler a plus de 130 km/h avec un camion ?). 
+
+```{r}
+# Nombre de camions avec une vitesse supérieure à 130 km/h
+siwim_data[Vitesse > 130, .N]
+```
+Les derniers tracteurs de Volvo le peuvent. Mais nous pensons plutôt que ceux-ci ne fréquentent pas le pont de Normandie où la vitesse est de plus limitée à 90 km/h et que les camions chargés ont du mal à monter la pente. Nous devrons donc corriger ces valeurs aberrantes.
+
+
+```{r}
+# Masse du camion
+ggplot(varquanti,aes("", y = MGV)) + geom_boxplot()
+```
+
+La Mediane du poids a 19 tonnes.
+Plusieurs valeurs semblent aberrantes (des camions de plus cent tonnes).
+
+```{r}
+# Camion avec un poids global supérieur à 70 tonnes
+siwim_data[MGV > 70, .N]
+
+```
+
+La limite légale étant à 44 tonnes et des poids lourds peuvent être surchargés, mais à partir de 70 tonnes il est sûr que les essieux ne tiennent pas la charge. 
+Nous considérerons cette limite pour traiter les valeurs aberrantes. 
+
+De plus, il existent un nombre important de camions dont le poids est égal à 0 :
+
+```{r}
+# Nombre de camions avec un poids égal à 0
+siwim_data[MGV == 0, .N]
+```
+
+Ces valeurs manquantes devront être traitées.
+
+
+# Traitement des valeurs manquantes et aberrantes
+
+Deux types de valeurs doivent être retraitées :
+
+- les valeurs **manquantes**, qui doivent soit être estimées, soit éliminées par suppression de l'enregistrement associé
+- les valeurs **aberrantes**, qui doivent soit être corrigées, soit éliminées par suppression de l'enregistrement associé
+
+Nous allons explorer ces deux approches, en construisant deux jeux de données. Le premier avec des valeurs estimées, le deuxième avec des valeurs supprimées.
+
+On travaille sur le tableau simplifié des variables quantitatives.  
+
+**Idée générale** : attribuer aux données aberrantes (dont nous sommes surs qu'elles soient fausses) un valeur "NA" puis reconstituer leur valeur grasse aux techniques d'imputation du package `"missMDA"`.
+
+Les seuils sont fixés à partir de la connaissance métier.
+
+```{r}
+# On considere qu'une valeur supérieure à 8 essieux est aberrante
+siwim_data[siwim_data$N > 8, N := NA]
+siwim_data[is.na(siwim_data$N), Nb_axles := NA]
+
+```
+
+```{r}
+# On considere comme valeur anormale une distance totale entre les axes > à 20 m
+siwim_data[total_axle_dist > 20, total_axle_dist := NA]
+
+```
+
+```{r}
+# On considere comme valeur anormale les températures négatives < à -10°C
+siwim_data[T < -20, T := NA]
+```
+
+```{r}
+# On considere comme valeur anormale la vitesse d'un camion > à 130 km/h
+siwim_data[Vitesse > 130, Vitesse := NA]
+```
+
+```{r}
+# On considere comme valeur anormale la masse d'un camion > à 70 T 
+siwim_data[MGV > 70, MGV := NA]
+```
+
+
+On supprime des variables liées à un trop grand nombre d'axes :
+
+```{r}
+siwim_data [, c("A8", "A9","A10","A11","A12","A13","A14","A15","M9","M10",
+                "M11","M12","M13","M14","M15","M16") := NULL]
+```
+
+
 
 
 
