@@ -7,7 +7,7 @@ output:
 
 ```{r "setup", include=FALSE}
 # Configuration locale du chemin du projet SIWIM :
-knitr::opts_knit$set(root.dir = normalizePath("/home/jeremy/Bureau/Certificat Data Scientist ENSAE/SiWIM-project")) 
+knitr::opts_knit$set(root.dir = normalizePath("Z:/Data Science/R/SiWIM-project")) 
 ```
 
 # Feature engineering
@@ -22,6 +22,7 @@ library(stringr) # manipulation de chaine de caracteres
 library(missMDA) # imputation des données manquantes
 library(questionr) # calcul Vcramer et des fréquences
 library(ggplot2)
+library(missMDA) # imputation des donnees manquante
 
 ```
 
@@ -404,12 +405,69 @@ siwim_data [, c("A8", "A9","A10","A11","A12","A13","A14","A15","M9","M10",
                 "M11","M12","M13","M14","M15","M16") := NULL]
 ```
 
+On prépare le jeu de donnees `siwim_data_imput` contenant seulement les variables utiles pour l'imputation :
 
+```{r}
+siwim_data_imput <- siwim_data[, c( "Lane", "N", "Nb_axles", "Anomalie", "total_axle_dist", "T", 
+   "Reduced_chi_squared", "Time_num", "Vitesse", "MGV")]
+```
 
+L'imputation est réalisée par analyse factorielle des données multiples (FAMD) du package `Factominer`.
+Nous retenons l'information apportée par 7 axes factoriels :
 
+```{r}
+siwim_data_inputted <- imputeFAMD(siwim_data_imput, ncp = 7, method = "Regularized")
+```
 
+Voici le résumé des données après imputation :
+```{r}
+summary(siwim_data_inputted$completeObs)
+```
 
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+```{r}
+# Transformation en data frame :
+siwim_data_inputted <- as.data.frame(siwim_data_inputted$completeObs)
+```
 
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+On concatène les variables imputées avec les colonnes initiales
+```{r}
+siwim_data_inputted_final <- cbind(siwim_data[, -c( "Lane","N", "Nb_axles", "Anomalie", "total_axle_dist", "T", "Reduced_chi_squared", "Time_num", "Vitesse", "MGV")],siwim_data_inputted)
+```
+
+Voici le résumé du jeu de données final après imputation, en comparaison de celui obtenu initialement :
+
+```{r}
+summary(siwim_data[,.( Lane,N, Nb_axles, Anomalie, total_axle_dist, T, Reduced_chi_squared, Time_num, Vitesse, MGV)])
+summary(siwim_data_inputted_final[,.( Lane,N, Nb_axles, Anomalie, total_axle_dist, T, Reduced_chi_squared, Time_num, Vitesse, MGV)])
+```
+
+La deuxième approche consiste à éliminer les individus ayant des valeurs manquantes et / ou aberrantes.
+
+```{r}
+## Other data tables where missing values are deleted
+siwim_data_missing_del <- siwim_data[!is.na(siwim_data$N)
+                                            & !is.na(siwim_data$total_axle_dist) 
+                                            & !is.na(siwim_data$T)
+                                            & !is.na(siwim_data$Vitesse)
+                                            & !is.na(siwim_data$MGV)]
+```
+
+Résumé des donnnées sans ces valeurs aberrantes :
+
+```{r}
+summary(siwim_data_missing_del[,.( Lane,N, Nb_axles, Anomalie, total_axle_dist, T, Reduced_chi_squared, Time_num, Vitesse, MGV)])
+```
+
+Nous constatons que les deux méthodes semblent aboutir à des résultats similaires : les résumés montrent que les valeur prises par les indicateurs de dispersion et de position restent semblables.
+
+Nous stockons à présent nos trois jeux de données pour les prochaines analyses :
+
+```{r}
+write.csv(siwim_data, file = "2_Data/2_Retraitees/SiWIM_data_prepared.csv")
+
+write.csv(siwim_data_inputted_final, file = "2_Data/2_Retraitees/SiWIM_data_after_input.csv")
+
+write.csv(siwim_data_missing_del, file = "2_Data/2_Retraitees/SiWIM_data_missing_deleted.csv")
+```
+
 

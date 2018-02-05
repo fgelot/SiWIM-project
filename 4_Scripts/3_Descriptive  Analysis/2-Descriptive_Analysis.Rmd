@@ -1,0 +1,50 @@
+---
+title: "Découverte du jeu de données du projet SIWIM"
+output: 
+  html_document:
+    df_print: paged
+---
+
+```{r "setup", include=FALSE}
+# Configuration locale du chemin du projet SIWIM :
+knitr::opts_knit$set(root.dir = normalizePath("Z:/Data Science/R/SiWIM-project")) 
+```
+
+# Introduction
+
+Nous poursuivons dans cette section notre analyse descriptive du jeu de données par une étude bi-dimensionnelle des variables qualitatives et quantitatives. 
+
+Nous compléterons avec quelques indicateurs quantitatifs et graphiqes.
+
+Enfin, nous utiliserons des techniques d'analyses multidimensionnelles : les analyses factorielles et le clustering afin de poursuivre l'exploration de notre jeu de données.
+
+
+```{r}
+# chargement des librairies 
+
+library(data.table)
+library(stringr) # manipulation de chaine de caracteres
+library(missMDA) # imputation des données manquantes
+library(questionr) # calcul Vcramer et des fréquences
+library(ggplot2)
+library(missMDA) # imputation des donnees manquante
+
+```
+
+```{r}
+# chargement des données
+
+
+```
+
+
+
+# Analyse bi dimensionnelle (étude des liaisons)
+
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
