@@ -1,5 +1,5 @@
 ---
-title: "Découverte du jeu de données du projet SIWIM"
+title: "Suite de l'analyse descriptive du jeu de données SIWIM"
 output: 
   html_document:
     df_print: paged
@@ -14,32 +14,89 @@ knitr::opts_knit$set(root.dir = normalizePath("Z:/Data Science/R/SiWIM-project")
 
 Nous poursuivons dans cette section notre analyse descriptive du jeu de données par une étude bi-dimensionnelle des variables qualitatives et quantitatives. 
 
-Nous compléterons avec quelques indicateurs quantitatifs et graphiqes.
+Nous compléterons avec quelques indicateurs quantitatifs et graphiques.
 
-Enfin, nous utiliserons des techniques d'analyses multidimensionnelles : les analyses factorielles et le clustering afin de poursuivre l'exploration de notre jeu de données.
+Enfin, nous utiliserons des techniques d'analyses multidimensionnelles : les analyses factorielles et le clustering non supervisé afin de poursuivre l'exploration de notre jeu de données.
 
 
 ```{r}
 # chargement des librairies 
 
 library(data.table)
-library(stringr) # manipulation de chaine de caracteres
-library(missMDA) # imputation des données manquantes
 library(questionr) # calcul Vcramer et des fréquences
 library(ggplot2)
-library(missMDA) # imputation des donnees manquante
 
 ```
+
+Nous choisissons de poursuivre nos analyses sur la base du jeu de données dont les données manquantes ont été imputées :
 
 ```{r}
-# chargement des données
+
+# Chargement
+siwim_imputed <- read.csv("2_Data/2_Retraitees/SiWIM_data_after_input.csv")
+
+# Transformation en data table
+setDT(siwim_imputed)
+
+```
+
+On effectue quelques conversions post import des données
+```{r}
+
+# Conversion en factor de Subclass_ID
+siwim_imputed[, Subclass_ID := factor(as.character(Subclass_ID))]
+
+# Conversion en factor de la variable Axle_groups
+siwim_imputed[, Axle_groups := factor(as.character(Axle_groups))]
+
+# Conversion en factor de la variable Nb_Axles (nombre d'axes)
+siwim_imputed[, Nb_axles := factor(as.character(N))]
+
+# Conversion en factor de la variable Annee
+siwim_imputed[, Annee := factor(as.character(Annee))]
+
+# Conversion en factor de la variable Mois_num
+siwim_imputed[, Mois_num := factor(as.character(Mois_num))]
+
+# Conversion en factor de la variable Jour_num
+siwim_imputed[, Jour_num := factor(as.character(Jour_num))]
+
+# Conversion en factor de la variable Heure
+siwim_imputed[, Heure := factor(Heure)]
 
 
 ```
+
+
+Nous recréons deux jeux de données séparant variables quantitatives et qualitatives :
+
+```{r}
+varquanti <- siwim_imputed[, lapply(siwim_imputed, is.numeric) == TRUE, with = FALSE]
+varquali <- siwim_imputed[,lapply(siwim_imputed,is.numeric) == FALSE, with = FALSE]
+```
+
+Analyse du 
+
+```{r}
+# Croisement heure  et jour de passage
+table(varquali$Jour_semaine,varquali$Heure)
+plot(table(varquali$Jour_semaine,varquali$Heure))
+```
+
 
 
 
 # Analyse bi dimensionnelle (étude des liaisons)
+
+
+
+
+
+
+
+
+
+
 
 
 

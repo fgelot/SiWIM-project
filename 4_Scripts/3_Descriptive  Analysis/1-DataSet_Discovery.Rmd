@@ -22,7 +22,6 @@ library(stringr) # manipulation de chaine de caracteres
 library(missMDA) # imputation des données manquantes
 library(questionr) # calcul Vcramer et des fréquences
 library(ggplot2)
-library(missMDA) # imputation des donnees manquante
 
 ```
 
