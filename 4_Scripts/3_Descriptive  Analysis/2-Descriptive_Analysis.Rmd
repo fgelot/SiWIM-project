@@ -64,7 +64,6 @@ siwim_imputed[, Jour_num := factor(as.character(Jour_num))]
 # Conversion en factor de la variable Heure
 siwim_imputed[, Heure := factor(Heure)]
 
-
 ```
 
 
