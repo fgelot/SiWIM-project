@@ -7,7 +7,7 @@ output:
 
 ```{r "setup", include=FALSE}
 # Configuration locale du chemin du projet SIWIM :
-knitr::opts_knit$set(root.dir = normalizePath("Z:/Data Science/R/SiWIM-project")) 
+knitr::opts_knit$set(root.dir = normalizePath("/home/jeremy/Bureau/Certificat Data Scientist ENSAE/SiWIM-project")) 
 ```
 
 # Feature engineering

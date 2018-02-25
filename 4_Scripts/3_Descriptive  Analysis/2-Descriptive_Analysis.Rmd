@@ -7,7 +7,7 @@ output:
 
 ```{r "setup", include=FALSE}
 # Configuration locale du chemin du projet SIWIM :
-knitr::opts_knit$set(root.dir = normalizePath("Z:/Data Science/R/SiWIM-project")) 
+knitr::opts_knit$set(root.dir = normalizePath("/home/jeremy/Bureau/Certificat Data Scientist ENSAE/SiWIM-project")) 
 ```
 
 # Introduction
@@ -23,8 +23,11 @@ Enfin, nous utiliserons des techniques d'analyses multidimensionnelles : les ana
 # chargement des librairies 
 
 library(data.table)
-library(questionr) # calcul Vcramer et des fréquences
+library(questionr)  # calcul Vcramer et des fréquences
 library(ggplot2)
+library(corrplot)   # affichage matrice des correlations
+library(FactoMineR) # analyses factorielles
+library(factoextra) # beaux graphiques pour analyses factorielles et clustering
 
 ```
 
@@ -35,12 +38,15 @@ Nous choisissons de poursuivre nos analyses sur la base du jeu de données dont 
 # Chargement
 siwim_imputed <- read.csv("2_Data/2_Retraitees/SiWIM_data_after_input.csv")
 
+# Structure du fichier
+str(siwim_imputed)
+
 # Transformation en data table
 setDT(siwim_imputed)
 
 ```
 
-On effectue quelques conversions post import des données
+On effectue quelques conversions post import des données :
 ```{r}
 
 # Conversion en factor de Subclass_ID
@@ -50,7 +56,7 @@ siwim_imputed[, Subclass_ID := factor(as.character(Subclass_ID))]
 siwim_imputed[, Axle_groups := factor(as.character(Axle_groups))]
 
 # Conversion en factor de la variable Nb_Axles (nombre d'axes)
-siwim_imputed[, Nb_axles := factor(as.character(N))]
+siwim_imputed[, Nb_axles := as.factor(as.character(Nb_axles))]
 
 # Conversion en factor de la variable Annee
 siwim_imputed[, Annee := factor(as.character(Annee))]
@@ -64,6 +70,8 @@ siwim_imputed[, Jour_num := factor(as.character(Jour_num))]
 # Conversion en factor de la variable Heure
 siwim_imputed[, Heure := factor(Heure)]
 
+# Structure apres conversions
+str(siwim_imputed)
 ```
 
 
@@ -74,26 +82,161 @@ varquanti <- siwim_imputed[, lapply(siwim_imputed, is.numeric) == TRUE, with = F
 varquali <- siwim_imputed[,lapply(siwim_imputed,is.numeric) == FALSE, with = FALSE]
 ```
 
-Analyse du 
+# Retour sur variables quanti (post -imputation)
+
+Nous construisons quelques boxplot, des variables quantitatives les plus intéressantes, après avoir imputer les données.
+
+```{r}
+# Nombre d'essieux
+ggplot(varquanti,aes("", y = N)) + geom_boxplot()
+
+# Distance totale entre les essieux les plus éloignés
+ggplot(varquanti,aes("", y = total_axle_dist)) + geom_boxplot()
+
+# Temperature utilisée par la compensation
+ggplot(varquanti,aes("", y = T)) + geom_boxplot()
+
+# Vitesse
+ggplot(varquanti,aes("", y = Vitesse)) + geom_boxplot()
+
+# Masse du camion
+ggplot(varquanti,aes("", y = MGV)) + geom_boxplot()
+```
+
+# Analyse bi dimensionnelle (étude des liaisons)
+
+
+### Etude des liaisons entre variables qualitatives
+
 
 ```{r}
 # Croisement heure  et jour de passage
 table(varquali$Jour_semaine,varquali$Heure)
-plot(table(varquali$Jour_semaine,varquali$Heure))
+plot(table(varquali$Jour_semaine,varquali$Heure),main = "fréquence de circulation suivant le jour et l'heure")
+```
+
+Les camions circulent peu le Samedi et le Dimanche et nettement moins la nuit.
+
+```{r}
+# On travaille avec un sous ensemble utiles des variables qualitatives
+varquali2 <- varquali[,.(Warning_flags,Subclass_ID,Axle_groups,Mois_annee,Jour_semaine,Heure,Lane,Nb_axles,Anomalie)]
+varquali2 <- as.data.frame(varquali2)
+```
+
+Nous allons à présent étudier la force de la liaison entre les variables qualitatives, et pour cela, calculer le V de Cramer.
+Le V de Cramer présente l'avantage d'offrir une mesure absolue de l'intensité de la liaison entre deux variables qualitatives.
+La liaison est nulle quand V =0, liaison est maximales lorsque V = 1.
+
+```{r}
+# liaisons entre variables qualitatives (calcul du V de Cramer)
+cramer <- matrix(NA, ncol(varquali2), ncol(varquali2))
+for (i in (1:ncol(varquali2))){
+  for (j in (1:ncol(varquali2))){
+    cramer[i,j] <- cramer.v(table(varquali2[,i], varquali2[,j]))
+  }
+}
+
+colnames(cramer) <- colnames(varquali2)
+rownames(cramer) <- colnames(varquali2)
+
+corrplot(cramer, method="number")
+```
+
+ Il semble y avoir un lien entre le fait de rouler à gauche ou à droite (`lane`) et le mois de circulation. Attention car les données ont été récupérées sur un nombre de mois limités (ici 5 mois).
+Il semble également y avoir un lien entre l'heure de circulation et le fait de rouler à gauche ou à droite. Mais ce lien est plutôt faible.
+
+Le Vcramer est important entre la classification réalisée par le système `SubClasss_ID` et le groupe d'essieux `Axle_Group` ce qui parait logique.
+Le nombre d'axes `Nb_Axles` est lié totalement au groupe d'essieux`Axles_groups`. 
+
+Il semble également y avoir un lien entre le déclenchement d'une anomalie `Anomalie` et la classification réalisée par le système : des groupes de camions sont-ils plus sujets à déclencher des anomalies ?
+
+### Etude des liaisons entre variables quantitatives
+
+
+```{r}
+# On travaille avec un sous ensemble utiles des variables quantitatives
+varquanti2 <- varquanti[,c("N", "total_axle_dist","T","Reduced_chi_squared","Time_num","Vitesse","MGV")]
+```
+
+Nous calculons le coefficient de corrélation linéaire de Pearson entre les variables quantitatives :
+
+```{r}
+# Matrice de correlation (Pearson) 
+corr <- cor(varquanti2)
+corrplot(corr, method="number")
+```
+
+La distance totale entre les essieux `total_axle_dist` est corrélée linéairement au nombre d'essieux `N`.
+Une corrélation négative est observable, plutot forte, entre vitesse `Vitesse` et masse `Masse` (plus le poids lourd est massique, moins il va vite).
+Une corrélation linéaire non négligeable existe également entre le nombre d'essieux et la masse du camion.
+Une faible corrélation entre masse et nombre d'essieux et entre vitesse et nombre d'essieux (corrélation négative).
+
+Nous observons ainsi plusieurs relations linéaires entre les données physiques. Ainsi il apparait qu'un camion massique roulera moins vite, qu'il est plus long et a plus d'essieux.
+Enfin, il apparait logique que la température du système `T` soit fortement corrélée négativement à la variable temporelle `Time_num` car les données ont été récupérées de l'été 2017 à novembre 2017.
+
+### Etude des liaisons entre variables quantitatives
+
+On constitue le jeu de données finales, se composant des variables quantitatives et qualitatives utiles :
+```{r}
+siwim_final <-cbind(varquali2,varquanti2)
+```
+
+Intéressons nous aux variables quantitatives et analysons graphiquement leur liaison avec la variable qualitative `Anomalie`:
+
+```{r}
+# Température / Ano
+ggplot(siwim_final, aes(Anomalie, y=T, group=Anomalie)) + 
+geom_boxplot(aes(fill=Anomalie))+
+ggtitle("Profil de la temperature en fonction du déclenchement d'anomalie")
+
+# Nb d'essieux / Ano
+ggplot(siwim_final, aes(Anomalie, y=N, group=Anomalie)) + 
+geom_boxplot(aes(fill=Anomalie))+
+ggtitle("Profil du nombre d'essieux en fonction du déclenchement d'anomalie")
+
+# Vitesse / Ano
+ggplot(siwim_final, aes(Anomalie, y=Vitesse, group=Anomalie)) + 
+geom_boxplot(aes(fill=Anomalie))+
+ggtitle("Profil de la vitesse en fonction du déclenchement d'anomalie")
+
+# Masse / Ano
+ggplot(siwim_final, aes(Anomalie, y=MGV, group=Anomalie)) + 
+geom_boxplot(aes(fill=Anomalie))+
+ggtitle("Profil de la masse en fonction du déclenchement d'anomalie")
+
+# Distance totale entre les essieux / Ano
+ggplot(siwim_final, aes(Anomalie, y=total_axle_dist, group=Anomalie)) + 
+geom_boxplot(aes(fill=Anomalie))+
+ggtitle("Profil de la distance totale entre essieux en fonction du déclenchement d'anomalie")
+
+
+```
+ Il est difficile de tirer des conclusions à travers ces graphiques.
+
+Nous envisageons de réaliser des analyses multidimentionnelles qui permettront de résumer les informations et les relations entre les variables.
+
+# Analyse Factorielles
+
+Les analyses factorielles permettent de résumer l'information contenues dans nos données.
+
+L'analyse en composante principale permet de résumer l'information conjointe entre des données quantitatives, en captant les relations linéaires entre les variables.
+
+L'analyse des correspondances multiples, permet quant à elle de résumer l'information entre variables qualitatives.
+
+Nous décidons ici d'utiliser le package `FactoMineR` et d'utiliser la méthode `AFMD (Analyse Factorielle des Donnée Mixtes)`, en anglais FAMD (Factor Analysis for Mixed Data), dont l'intéret est de construire un nouveau système de représentation (facteurs, axes factorielles : combinaisons linéaires des variables quantitatives et des indicatrices des variables qualitatives) qui permet de synthétiser l'information.
+
+```{r}
+
 ```
 
 
 
 
-# Analyse bi dimensionnelle (étude des liaisons)
+# Clustering (apprentissage non supervisé)
 
+```{r}
 
-
-
-
-
-
-
+```
 
 
 
