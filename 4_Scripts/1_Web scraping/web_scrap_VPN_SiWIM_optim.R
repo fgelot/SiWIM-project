@@ -11,7 +11,7 @@ library('httr')
 library(rvest)
 library(stringi)
 library(data.table)
-library(parallel
+library(parallel)
 
 #Access infos
 user <- 'fschmidt'
@@ -19,9 +19,9 @@ pwd <- 'yBgVLjS7tj'
 url <- 'https://vpn.siwim.si/siwim-s/login.php'
 values <- list(username = user, password = pwd)
 
-start_date <- as.Date("2017-07-01")
+start_date <- as.Date("2017-11-23")
 
-end_date <- as.Date("2018-01-24")
+end_date <- as.Date("2018-02-23")
 
 #Login
 POST(url, body = values)
