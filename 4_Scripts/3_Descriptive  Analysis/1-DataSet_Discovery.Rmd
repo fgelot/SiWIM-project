@@ -332,7 +332,7 @@ ggplot(varquanti,aes("", y = MGV)) + geom_boxplot()
 ```
 
 La Mediane du poids a 19 tonnes.
-Plusieurs valeurs semblent aberrantes (des camions de plus cent tonnes).
+Plusieurs valeurs semblent aberrantes (des camions de plus cent tonnes ou des camions avec un poids de 0 tonnes). 
 
 ```{r}
 # Camion avec un poids global supérieur à 70 tonnes
@@ -392,8 +392,8 @@ siwim_data[Vitesse > 130, Vitesse := NA]
 ```
 
 ```{r}
-# On considere comme valeur anormale la masse d'un camion > à 70 T 
-siwim_data[MGV > 70, MGV := NA]
+# On considere comme valeur anormale la masse d'un camion > à 70 T ou égale à 0
+siwim_data[MGV > 70 | MGV == 0, MGV := NA]
 ```
 
 
@@ -440,10 +440,24 @@ summary(siwim_data[,.( Lane,N, Nb_axles, Anomalie, total_axle_dist, T, Reduced_c
 summary(siwim_data_inputted_final[,.( Lane,N, Nb_axles, Anomalie, total_axle_dist, T, Reduced_chi_squared, Time_num, Vitesse, MGV)])
 ```
 
+L'imputation semble donner de bons résultats. Etant basée sur une méthode d'estimation, les valeurs imputées peuvent de nouveaux franchir les limites fixées.
+Nous pouvons soit les supprimer, soit imputer aux valeurs limites de manière à conserver la donnée et donc le plus d'information possible.
+
+```{r}
+# Fixation aux valeurs limites pour les imputations qui auraient franchies les limites théoriques
+siwim_data_inputted_final[N > 8, N := 8]
+siwim_data_inputted_final[total_axle_dist > 20, total_axle_dist := 20]
+siwim_data_inputted_final[T < -20, T := -10]
+siwim_data_inputted_final[Vitesse > 130, Vitesse := 130]
+siwim_data_inputted_final[MGV < 0, MGV := 0.5]
+siwim_data_inputted_final[MGV > 70, MGV := 70]
+```
+
+
 La deuxième approche consiste à éliminer les individus ayant des valeurs manquantes et / ou aberrantes.
 
 ```{r}
-## Other data tables where missing values are deleted
+## Suppression des individus comportant des donnees manquantes
 siwim_data_missing_del <- siwim_data[!is.na(siwim_data$N)
                                             & !is.na(siwim_data$total_axle_dist) 
                                             & !is.na(siwim_data$T)
@@ -451,7 +465,7 @@ siwim_data_missing_del <- siwim_data[!is.na(siwim_data$N)
                                             & !is.na(siwim_data$MGV)]
 ```
 
-Résumé des donnnées sans ces valeurs aberrantes :
+Résumé des données sans ces valeurs aberrantes :
 
 ```{r}
 summary(siwim_data_missing_del[,.( Lane,N, Nb_axles, Anomalie, total_axle_dist, T, Reduced_chi_squared, Time_num, Vitesse, MGV)])

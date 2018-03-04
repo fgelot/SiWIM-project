@@ -37,6 +37,7 @@ Nous choisissons de poursuivre nos analyses sur la base du jeu de données dont 
 
 # Chargement
 siwim_imputed <- read.csv("2_Data/2_Retraitees/SiWIM_data_after_input.csv")
+#siwim_imputed <- read.csv("2_Data/2_Retraitees/SiWIM_data_missing_deleted.csv")
 
 # Structure du fichier
 str(siwim_imputed)
@@ -82,7 +83,7 @@ varquanti <- siwim_imputed[, lapply(siwim_imputed, is.numeric) == TRUE, with = F
 varquali <- siwim_imputed[,lapply(siwim_imputed,is.numeric) == FALSE, with = FALSE]
 ```
 
-# Retour sur variables quanti (post -imputation)
+# Retour sur variables quanti (post - imputation)
 
 Nous construisons quelques boxplot, des variables quantitatives les plus intéressantes, après avoir imputer les données.
 
@@ -178,7 +179,11 @@ Enfin, il apparait logique que la température du système `T` soit fortement co
 
 On constitue le jeu de données finales, se composant des variables quantitatives et qualitatives utiles :
 ```{r}
+# Jeu de donnée final
 siwim_final <-cbind(varquali2,varquanti2)
+
+# Transformation en data table
+setDT(siwim_final)
 ```
 
 Intéressons nous aux variables quantitatives et analysons graphiquement leur liaison avec la variable qualitative `Anomalie`:
@@ -223,21 +228,277 @@ L'analyse en composante principale permet de résumer l'information conjointe en
 
 L'analyse des correspondances multiples, permet quant à elle de résumer l'information entre variables qualitatives.
 
-Nous décidons ici d'utiliser le package `FactoMineR` et d'utiliser la méthode `AFMD (Analyse Factorielle des Donnée Mixtes)`, en anglais FAMD (Factor Analysis for Mixed Data), dont l'intéret est de construire un nouveau système de représentation (facteurs, axes factorielles : combinaisons linéaires des variables quantitatives et des indicatrices des variables qualitatives) qui permet de synthétiser l'information.
+Nous décidons ici d'utiliser le package `FactoMineR` et d'utiliser la méthode `AFDM (Analyse Factorielle des Donnée Mixtes)`, en anglais FAMD (Factor Analysis for Mixed Data), dont l'intéret est de construire un nouveau système de représentation (facteurs, axes factorielles : combinaisons linéaires des variables quantitatives et des indicatrices des variables qualitatives) qui permet de synthétiser l'information.
+
+Nous souhaitons avoir les réponses aux questions suivantes :
+
+* Quels sont les camions qui se ressemblent (proximité entre les individus) ?
+* Sur quelles caractéristiques sont fondées les ressemblances / dissemblances ?
+* Quelles sont les relations entre les variables ?
+* Quelles sont les relations entres les modalités et les variables quantitatives ?
+
+## Analyse Factorielle des Donnees Mixes (AFDM)
 
 ```{r}
+# Calcul de l'AFDM
+res_FAMD <-FAMD(siwim_final[,-c(1:3)], graph = FALSE,ncp = 5)
+```
 
+Etudions la variance (inertie) expliquée par les axes de l'analyse factorielle :
+
+```{r}
+eig_val <- get_eigenvalue(res_FAMD)
+head(eig_val)
+```
+
+Le premier plan factoriel explique 13% de l'inertie totale. Cela signifie que 13% de l'information du nuage est expliquée par cet axe. **Cela est relativement faible**.
+
+Les 5 premiers axes exliquent quant à eux seulement 22 % de l'inertie totale, ce qui est insuffisant pour une réduction de dimenssionnalité à utiliser en entrée d'un traitement ultérieur.
+
+Le but recherché est de trouver une représentation synthétique des donnée, afin de notamment caractériser des groupes de camions par clustering s'appuyant sur cette représentation.
+
+Les variables qualitatives sont essentiellement des variables de contexte (heure, jour, mois de passage, ainsi que la variable `Anomalie` déclenchée par le système de pesage.)
+Les variables quantitatives sont essentiellement des descripteurs des camions.
+
+Nous proposons donc d'appliquer une Analyse en Composantes Principales sur les données quantitatives avec les **variables qualitatives en illustration**. Ces variables qualitatives ne participeront pas à la construction des axes, mais en faciliteront leur description.
+
+
+## Analyse en Composantes Principales (ACP)
+
+```{r}
+# Preparation du jeu de donnee
+don_PCA <- cbind.data.frame(varquanti2,varquali2[,c("Mois_annee","Jour_semaine","Heure","Lane","Anomalie")])
+```
+
+L'ACP normée (sur données centrées-réduites) est calculée en précisant les variables qualitatives en supplémentaires :
+
+```{r}
+# Calcul de l'ACP avec variables qualitatives supplementaires
+res_PCA <-PCA(don_PCA, scale.unit = TRUE, graph = FALSE,ncp = Inf, quali.sup = 8:12)
 ```
 
 
+### Variance / Inertie Expliquee
+
+Etudions la variance (inertie) expliquée par les axes de l'analyse factorielle :
+
+```{r}
+eig_val <- get_eigenvalue(res_PCA)
+head(eig_val)
+```
+
+Les 7 premières composantes principales capturent 100%  de l'inertie (variabilité) du nuage de point initial
+les 4 premières 89% et les 5 premières 94%. 
+Nous proposerons plus loin de conserver un sous-ensemble d'axes capturant l'essentiel de la variabilité et réduisant le nuage de points initial en évitant d'utiliser des axes supplémentaires qui seront assimilés à du bruit.
+Nous rappelons que l'ACP "capture" ou met en évidence les relations linéaires entre les variables. Nous sommes conscients que les relations non linéaires entre les variables ne seront ici pas mises en évidence.
+
+Une méthode couramment utilisée est celle consistant à afficher le graphique du coude (scree plot) :
+
+```{r}
+fviz_eig(res_PCA, addlabels = TRUE, ylim = c(0, 50))
+```
+
+Le nombre d’axes est déterminé par le point, au-delà duquel les valeurs propres restantes sont toutes relativement petites et de tailles comparables (Jollife 2002, Peres-Neto, Jackson, and Somers (2005)).
+
+Nous proposerons de conserver par la suite les 4 premières composantes principales qui représentent 89% de la variation.
+
+Le premier plan factoriel, présente l'intérêt d'être facilement interprétable (dimension 2) et de résumer 61 % de l'information. Les représentations graphiques qui suivront concerneront ce plan.
+
+
+### Graphiques des individus
+
+Affichons le nuage des individus (camions) dans le premier plan factoriel, ainsi que les modalités des variables qualitatives supplémentaires :   
+
+```{r}
+# Graphique des individus
+p <- fviz_pca_ind(res_PCA)
+fviz_add(p,res_PCA$quali.sup$coord,color = "red")
+```
+
+Il y a trop d'individus affichés, et il est donc impossible de débusquer des groupes de camions à l'oeil nu.
+Cette représentation permet par contre de constater la présence d'individus se détachant par leur valeur. Ainsi, l'individu **95521** a une coordonnée très forte sur l'axe 1 et a donc des valeurs fortes par rapport aux variables qui seront fortement corrélées à cet axe.
+Ce type d'individu peut être un outlier ou constituer un parangon, c'est à dire un représentant fort de la classe à laquelle il appartient.
+
+Nous allons analyser visuellement la qualité de représentation des individus (cos2) :
+
+Un point est dit bien représenté sur  un axe  ou un plan factoriel si il est proche de sa projection sur l’axe ou le plan. S’il est éloigné, on dit qu’il est mal représenté.  L'Indicateur est l'angle formé entre le point et sa projection sur l’axe (cos proche de 1 correspond à un individus bien representé).
+
+Représentons les 100 individus ayant le plus contribué à la construction des deux axes du plan factoriel principal, en colorant suivant la qualité de la représentation du point :
+
+```{r}
+# Graphique des 100 individus les plus contributeurs suivant leur qualite de representation
+p<- fviz_pca_ind(res_PCA, col.ind = "cos2", select.ind = list(contrib= 100)) + 
+               labs(title ="100 individus les plus contributeurs à la construction du premier plan factoriel")
+fviz_add(p,res_PCA$quali.sup$coord,color = "red")
+```
+
+Nous remarquons à l'aide de cette représentation visuelle, les points bien représentés (en bleu clair) et ceux dont la qualité de la représentation est moindre (bleu foncé), parmi les individus contribuant le plus à la construction des axes.
+
+Nous proposons une représentation visuelle, des 100 individus contribuant le plus à la construction du premier plan principal, en les colorant suivant si une anomalie a été déclenchée ou non durant leur passage :
+
+
+```{r}
+# Graphique des 100 individus les plus contributeurs avec coloration suivant la modalité de la variable Anomalie
+p <- fviz_pca_ind(res_PCA, select.ind = list(contrib= 100), habillage = siwim_final$Anomalie) +
+  labs(title ="100 individus les plus contributeurs à la construction du premier plan factoriel")
+fviz_add(p,res_PCA$quali.sup$coord,color = "red")
+```
+
+Le résultat visuel est étonnant : alors que seul 1 camion sur trois fait l'objet d'une anomalie déclenchée par le système de pesage, nous voyons clairement que la majorité des contributeurs aux axes sont des camions ayant déclenché une Anomalie.
+Ceci parait potentiellement cohérent avec les éventuelles valeurs fortes que prendraient ces camions par rapport à certaines valeurs physiques (surpoids).
+
+
+### Graphique des variables
+
+Nous allons visualiser les variables et formuler des conclusions concernant leur corrélation. Nous étudierons la qualité de leur représentation et leur contribution aux composantes principales.
+
+```{r}
+# Cercle des correlations coloré en fonction de la qualité de représentation 
+fviz_pca_var(res_PCA, col.var = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE # Évite le chevauchement de texte
+             ) + labs(title ="Cercle des corrélations - PCA")
+```
+
+
+Ce graphique montre les relations entre les variables qui sont regroupées quand elles sont corrélées. 
+
+Ici `N`(nombre d'essieux), `MGV`(masse du camion),`total_axle_dist` (distance totale entre les essieux les plus distants) sont fortement corrélés à la fois entre elles et à l'axe 1. Ces trois variables sont corrélées négativement à `Vitesse`.
+
+**Le premier axe oppose les camions les plus volumineux (car nombre d'essieux importants, masse importante, et longueur importante) au camion les plus petits, les moins lourds et qui sont les plus rapides.**
+
+**Le deuxième axe montre que la température `T` est corrélée négativement à la variable `Time_Num` qui est la variable de temps (continue).**
+`Time_num` est la variable numérique du temps : ici on montre que plus `Time_num` est importante, plus la température est basse.
+Ce qui est logique car la prise de mesure s'est déroulée entre depuis de l'Eté à l'hiver.
+
+### Contributions des variables aux axes principaux
+
+```{r}
+# Contribution des variables
+res_PCA$var$contrib
+```
+
+Plus la valeur de la contribution est importante, plus la variable contribue à la composante principale en question.
+Ainsi `N`, `total_axle_dist`, `MGV` contribuent le plus fortement à l'axe 1.
+`T` et `Time_num` expliquent à elle deux la variabilité de l'axe 2.
+
+```{r}
+# Contributions des variables à composante 1
+fviz_contrib(res_PCA, choice = "var", axes = 1)
+# Contributions des variables à composante 2
+fviz_contrib(res_PCA, choice = "var", axes = 2)
+```
+
+```{r}
+# Qualite de representation des variables
+res_PCA$var$cos2
+```
+
+la qualité de représentation (le cos2) est très bonne pour `N`et `total_axle_dist` et `MGV`. 
+`Vitesse` n'a pas une représentation excellente
+Sur l'axe 2, `T` et `Time_Num` sont très bien représentées.
+
+
+### Description des dimensions
+
+Nous avons decrit précédemment les axes constituant les deux dimensions du plan principal.
+
+La fonction suivante est utilisée pour identifier les variables les plus significativement associées à une composante principale. 
+
+```{r}
+dimdesc(res_PCA, axes = c(1,2), proba = 0.05)
+```
+
+La fonction de description `dimdesc` permet de mettre en évidence la relation des variables qualitatives supplémentaires (ainsi que leur modalité) avec les axes factoriels.
+Nous avons vu précédement dans les affichage graphiques, que le nuage des modalités des variables qualitatives se "concentrait" au centre du plan. Les variables qualitatives sont certes liées aux axes, mais possèdent des coordonnées ne prenant pas de valeurs significativement hautes ou basses, ce qui empêche de tirer des conclusions.
+
+Nous observons à titre d'exemple que la modalité `N` de la variable `Anomalie` a une coordonnée positive sur l'axe 1 (inversement pour la modalité `Y`) ce qui pourrait s'interpréter de la façon suivante : "les camions prenant des valeurs positives sur l'axe 1 ont tendance à ne pas déclencher d'anomalie". Nous rappelons que les camions prenant des valeur positives sur cet axe semblent être les plus volumineux.  
+
+Concernant l'axe 2, il est beaucoup plus net que la variable `Mois_annee` soit bien représentée. Ses modalités ont des coordonnées plus fortes en valeur absolue, discriminant le groupe de modalité `octobre, novembre` avec celui `Juillet, Aout`. Rappelons que cet axe discrimine les camions enregistrés lors d'une prise de température forte en opposition à ceux enregistrés lors d'une prise de température faible du système.
 
 
 # Clustering (apprentissage non supervisé)
 
+Nous avons vu précédemment que suite à l'ACP, les 4 premières composantes principales expliquaient 89 % de la variabilité.
+Nous réduisons donc notre nuage de point en effectuant une nouvelle ACP en ne conservant que les 4 premières variables.
+
+Chaque algorithme de clustering sera exécuté sur ce nouvel ensemble
+
+```{r}
+# On réalise un prétraitement par ACP normée en gardant 4 dimensions
+res_PCA2 <- PCA(varquanti2, scale.unit = TRUE, graph = FALSE,ncp = 4)
+```
+
+
+
+## Méthode hiérarchique : 
+
+Les méthodes hiérarchiques présentent l'intérêt de proposer un nombre optimal de cluster, dont le découpage est réalisé en optimisant un critère. 
+
+###  kmeans + CAH sur composantes principales
+
+Notre jeu de donnée contient plusieurs centaines de milliers d'individus. Nous allons donc être exposés à des problèmes calculatoires et de mémoire.
+
+Afin de contourner cette difficulté, nous allons réaliser en amont un partitionnement à l'aide des Kmeans. Nous fixons un nombre de partitions grand, avec pour objectif d'obtenir pour chacune une faible inertie intra-classe (homogéneité).
+
+On met ensuite en oeuvre une CAH sur ces groupes d'individus issus de l'étape précédente et on obtient une hiérarchie qui est approximativement la haut de la hiérarchie que l'on obtiendrait en classifiant les individus directement.
+
+
+```{r}
+res_kmeans <- kmeans(res_PCA2$ind$coord, centers = 3, nstart = 10, iter.max = 40) 
+res_CAH <- HCPC(res = res_kmeans$centers, nb.clust = -1, metric="euclidean", method="ward",order = FALSE, graph = FALSE)
+# CAH sur composantes principales, métrique euclidienne, avec methode de Ward
+#res_HCPC_kmeans <- HCPC(res = res_PCA2,nb.clust = -1, metric="euclidean", method="ward", order = #FALSE, kk = 1000)
+```
+
+
+## Partitionnement k - medoides : K-means sur composantes principales
+
+L'algorithme des kmeans nécessite de fixer à priori le nombre de classes, et l'initialisation au hazard peut donner des résultats assez variables.
+Nous faisons varier le nombre de classes et observer le résultat, en optimisant le rapport d'inertie
+
 ```{r}
 
 ```
 
+```{r}
+
+```
+
+
+### Estimation du nombre de clusters
+
+```{r}
+
+```
+
+ 
+## Partitionnement k - medoides : PAM
+
+```{r}
+
+```
+
+## Partitionnement k - medoides : CLARA
+
+Il s'agit d'un extension aux méthodes k-medoides pour traiter de grands jeux de données (milliers d'observations).
+
+```{r}
+
+```
+ 
+
+## Partitionnement basé sur densité : DBscan / Optics
+
+```{r}
+
+```
+
+##  Méthodes neuronales : cartes auto-adaptatives de Kohonen (SOM)
+
+```{r}
+
+```
 
 
 
