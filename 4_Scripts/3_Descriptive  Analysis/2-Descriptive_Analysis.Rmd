@@ -7,7 +7,7 @@ output:
 
 ```{r "setup", include=FALSE}
 # Configuration locale du chemin du projet SIWIM :
-knitr::opts_knit$set(root.dir = normalizePath("/home/jeremy/Bureau/Certificat Data Scientist ENSAE/SiWIM-project")) 
+knitr::opts_knit$set(root.dir = normalizePath("Z:/Data Science/R/SiWIM-project")) 
 ```
 
 # Introduction
@@ -28,6 +28,8 @@ library(ggplot2)
 library(corrplot)   # affichage matrice des correlations
 library(FactoMineR) # analyses factorielles
 library(factoextra) # beaux graphiques pour analyses factorielles et clustering
+library(fastcluster) # clustering CAH rapide
+library(cluster)     # clustering CLARA
 
 ```
 
@@ -422,13 +424,17 @@ Concernant l'axe 2, il est beaucoup plus net que la variable `Mois_annee` soit b
 Nous avons vu précédemment que suite à l'ACP, les 4 premières composantes principales expliquaient 89 % de la variabilité.
 Nous réduisons donc notre nuage de point en effectuant une nouvelle ACP en ne conservant que les 4 premières variables.
 
-Chaque algorithme de clustering sera exécuté sur ce nouvel ensemble
+Chaque algorithme de clustering sera exécuté sur ce nouvel ensemble.
 
 ```{r}
 # On réalise un prétraitement par ACP normée en gardant 4 dimensions
 res_PCA2 <- PCA(varquanti2, scale.unit = TRUE, graph = FALSE,ncp = 4)
+
+# On stocke les 4 premieres composantes principales dans un data frame
+don_PCA_clusters <- data.frame(res_PCA2$ind$coord)
 ```
 
+Chaque méthode testée produira ses clusters, qui seront stockés dans le data frame contenant les coordonnées des axes factoriels, afin de faciliter les comparaisons et représentations ultérieures. 
 
 
 ## Méthode hiérarchique : 
@@ -441,52 +447,119 @@ Notre jeu de donnée contient plusieurs centaines de milliers d'individus. Nous 
 
 Afin de contourner cette difficulté, nous allons réaliser en amont un partitionnement à l'aide des Kmeans. Nous fixons un nombre de partitions grand, avec pour objectif d'obtenir pour chacune une faible inertie intra-classe (homogéneité).
 
-On met ensuite en oeuvre une CAH sur ces groupes d'individus issus de l'étape précédente et on obtient une hiérarchie qui est approximativement la haut de la hiérarchie que l'on obtiendrait en classifiant les individus directement.
+On met ensuite en oeuvre une classification ascendante hiérarchique (CAH) sur ces groupes d'individus issus de l'étape précédente et on obtient une hiérarchie qui est approximativement la haut de la hiérarchie que l'on obtiendrait en classifiant les individus directement.
 
 
 ```{r}
-res_kmeans <- kmeans(res_PCA2$ind$coord, centers = 3, nstart = 10, iter.max = 40) 
-res_CAH <- HCPC(res = res_kmeans$centers, nb.clust = -1, metric="euclidean", method="ward",order = FALSE, graph = FALSE)
-# CAH sur composantes principales, métrique euclidienne, avec methode de Ward
-#res_HCPC_kmeans <- HCPC(res = res_PCA2,nb.clust = -1, metric="euclidean", method="ward", order = #FALSE, kk = 1000)
+# Kmeans sur un nombre grand nombre de clusters
+set.seed(123)
+res_kmeans_grand <- kmeans(don_PCA_clusters[,c("Dim.1","Dim.2","Dim.3","Dim.4")],centers=1000,iter=100)
+```
+
+On effectue ensuite une CAH sur les centres des classes :
+
+```{r}
+# Calcul de la matrice de distance (euclidienne)
+dist <- dist(res_kmeans_grand$centers,method="euclidean")
+
+# Classification Ascendante Hierarchique (methode de Ward)
+cah <- fastcluster::hclust(dist,method="ward.D")
+
+# Affichage dendrogramme
+plot(as.dendrogram(cah),main="Ward")
+
+```
+
+3 ou 4 groupes semblent se détacher.
+
+
+```{r}
+# Recherche du nombre de classe
+plot(sort(cah$height,decreasing=TRUE),xlim=c(0,35),type="h",ylab="Hauteur",main="Ward")
+lines(sort(cah$height,decreasing=TRUE),xlim=c(0,35))
+abline(v=3, lty=2, col='gray60')
+
+```
+
+Un niveau de coupure à 3 ou 4 classes semble être envisageable.
+
+Nous décidons de couper à 3 classes:
+
+```{r}
+# On décide du niveau de coupure
+classes_centres <- cutree(cah,k=3)
+
+# Nous rajoutons la variable de classe au jeu de données contenant les axes factoriels
+don_PCA_clusters$clusters_cah_mixte <- as.factor(classes_centres[res_kmeans_grand$cluster])
+```
+
+Représentons sur le premier axe factoriels, les individus colorés en fonction de leur groupe déterminés par la CAH mixte.
+
+```{r}
+# Affichage sur le premier plan principal des individus en fonction de leur groupes
+ggplot(don_PCA_clusters, aes(x=Dim.1, y=Dim.2, color=clusters_cah_mixte)) + geom_point() +
+    labs(title ="Représentation des camions sur le premier plan factoriel")
+```
+
+```{r}
+# Description des catégories
 ```
 
 
-## Partitionnement k - medoides : K-means sur composantes principales
+## Partitionnement : K-means sur composantes principales
 
 L'algorithme des kmeans nécessite de fixer à priori le nombre de classes, et l'initialisation au hazard peut donner des résultats assez variables.
 Nous faisons varier le nombre de classes et observer le résultat, en optimisant le rapport d'inertie
 
 ```{r}
+# kmeans sur 3 groupes
+set.seed(123)
+res_kmeans <- kmeans(don_PCA_clusters[,c("Dim.1","Dim.2","Dim.3","Dim.4")],centers=3,iter=500)
 
+# Nous rajoutons la variable de classe au jeu de données contenant les axes factoriels
+don_PCA_clusters$clusters_kmeans <- as.factor(res_kmeans$cluster)
 ```
 
 ```{r}
-
+# Affichage sur le premier plan principal des individus en fonction de leur groupes
+ggplot(don_PCA_clusters, aes(x=Dim.1, y=Dim.2, color=clusters_kmeans)) + geom_point() +
+    labs(title ="Représentation des camions sur le premier plan factoriel")
 ```
 
 
 ### Estimation du nombre de clusters
 
 ```{r}
-
+# fviz_cluster(res_kmeans, data = res_PCA2$ind$coord,
+#              palette = c("#2E9FDF", "#00AFBB", "#E7B800", "#FC4E07"), 
+#              ellipse.type = "euclid", # Concentration ellipse
+#              star.plot = TRUE, # Add segments from centroids to items
+#              repel = TRUE, # Avoid label overplotting (slow)
+#              ggtheme = theme_minimal()
+#              )
 ```
 
  
-## Partitionnement k - medoides : PAM
-
-```{r}
-
-```
-
 ## Partitionnement k - medoides : CLARA
 
-Il s'agit d'un extension aux méthodes k-medoides pour traiter de grands jeux de données (milliers d'observations).
+Il s'agit d'un extension aux méthodes k-medoides pour traiter de grands jeux de données (plusieursmilliers d'observations). Elle est donc adaptée à notre contexte :
 
 ```{r}
+# On applique la méthode CLARA sur 3 groupes
+set.seed(123)
+res_clara <- clara(don_PCA_clusters[,c("Dim.1","Dim.2","Dim.3","Dim.4")],k = 3)
+
+# Nous rajoutons la variable de classe au jeu de données contenant les axes factoriels
+don_PCA_clusters$clusters_clara <- as.factor(res_clara$clustering)
 
 ```
- 
+
+```{r}
+# Affichage sur le premier plan principal des individus en fonction de leur groupes
+ggplot(don_PCA_clusters, aes(x=Dim.1, y=Dim.2, color=clusters_clara)) + geom_point() +
+    labs(title ="Représentation des camions sur le premier plan factoriel")
+```
+
 
 ## Partitionnement basé sur densité : DBscan / Optics
 
@@ -500,6 +573,9 @@ Il s'agit d'un extension aux méthodes k-medoides pour traiter de grands jeux de
 
 ```
 
+##  Interprétation des classes
+
+Nous interpretons les classes construites dans chaque méthode. L'idée est de dégager une interprétation commune, favorisant l'utilité métier. 
 
 
 
