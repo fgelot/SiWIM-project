@@ -30,6 +30,7 @@ library(FactoMineR) # analyses factorielles
 library(factoextra) # beaux graphiques pour analyses factorielles et clustering
 library(fastcluster) # clustering CAH rapide
 library(cluster)     # clustering CLARA
+library(dbscan)
 
 ```
 
@@ -540,7 +541,10 @@ ggplot(don_PCA_clusters, aes(x=Dim.1, y=Dim.2, color=clusters_kmeans)) + geom_po
 ```
 
  
-## Partitionnement k - medoides : CLARA
+## Partitionnement k - medoides : CLARA sur composantes principales
+
+Un medoïde est le représentant le plus central d'une classe.
+L'algorithme des k-medoïdes réalise un partitionnement plus robuste vis à vis des données aberrantes, que celui des k-means.
 
 Il s'agit d'un extension aux méthodes k-medoides pour traiter de grands jeux de données (plusieursmilliers d'observations). Elle est donc adaptée à notre contexte :
 
@@ -560,12 +564,35 @@ ggplot(don_PCA_clusters, aes(x=Dim.1, y=Dim.2, color=clusters_clara)) + geom_poi
     labs(title ="Représentation des camions sur le premier plan factoriel")
 ```
 
+## Partitionnement k - medoides : PAM sur composantes principales
 
-## Partitionnement basé sur densité : DBscan / Optics
+PAM (Partitioning Around Medoid) est une implémentation populaire mais nécessite de calculer les distances entre chaque individus pris deux à deux et pénalise ainsi la scalabilité que nous rencontrons dans notre cas.
+
+## Partitionnement basé sur densité : DBscan / Optics sur composantes principales
+
+DBSCAN est un algorithme de partitionnement de type "densité". Il s'appuie sur la densité des données pour réaliser le partitionnement. 
+
 
 ```{r}
+# utilise deux parametres : 
+# distance epsilon et le nb de points minimum devant se trouver dans #un rayon epsilon pour considerer ces points comme un cluster
+set.seed(123)
+res_dbscan <- dbscan::dbscan(don_PCA_clusters[,c("Dim.1","Dim.2","Dim.3","Dim.4")], eps = 0.25, minPts = 100)
 
+# Nous rajoutons la variable de classe au jeu de données contenant les axes factoriels
+don_PCA_clusters$clusters_dbscan <- as.factor(res_dbscan$cluster)
 ```
+
+```{r}
+# Affichage sur le premier plan principal des individus en fonction de leur groupes
+ggplot(don_PCA_clusters, aes(x=Dim.1, y=Dim.2, color=clusters_dbscan)) + geom_point() +
+    labs(title ="Représentation des camions sur le premier plan factoriel")
+```
+
+L'algorithme est compliqué à configurer. 
+En jouant sur les deux paramètres, on n'obtient pas de regroupement visuellement satisfaisant.
+Nous essaierons néanmoins d'interpréter les clusters (voir ci après)
+
 
 ##  Méthodes neuronales : cartes auto-adaptatives de Kohonen (SOM)
 
@@ -576,6 +603,11 @@ ggplot(don_PCA_clusters, aes(x=Dim.1, y=Dim.2, color=clusters_clara)) + geom_poi
 ##  Interprétation des classes
 
 Nous interpretons les classes construites dans chaque méthode. L'idée est de dégager une interprétation commune, favorisant l'utilité métier. 
+
+```{r}
+# Interpretation des classes
+catdes(don_PCA_clusters,num.var = 5)
+```
 
 
 
