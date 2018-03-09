@@ -1,4 +1,4 @@
-"","time_step","Date","Annee","Mois_annee","Mois_num","Jour_num","Jour_sem_num","Heure","Semaine_num","semaine_fac","Heure_num","Jour_semaine","Count"
+"","time_step","Date","Annee","Mois_annee","Mois_num","Jour_num","Jour_sem_num","Heure","Semaine_num","Semaine_fac","Heure_num","Jour_semaine","Count"
 "1",2017-11-23 00:00:00,2017-11-23,2017,"novembre",11,23,4,"00",47,"47",0,"jeudi",14
 "2",2017-11-23 01:00:00,2017-11-23,2017,"novembre",11,23,4,"01",47,"47",1,"jeudi",11
 "3",2017-11-23 02:00:00,2017-11-23,2017,"novembre",11,23,4,"02",47,"47",2,"jeudi",9
