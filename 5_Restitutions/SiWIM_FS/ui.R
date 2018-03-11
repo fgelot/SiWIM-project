@@ -6,7 +6,7 @@ library(shiny)
 
 shinyUI(navbarPage("SiWIM project",
                    tabPanel("Surveillance du trafic et des ouvrages", 
-                            includeMarkdown("explic.md")),
+                            includeHTML("explic.html")),
                    tabPanel("Web scraping"),
                    navbarMenu("Data analysis",
                               tabPanel("Data description"),
@@ -15,6 +15,6 @@ shinyUI(navbarPage("SiWIM project",
                               ),
                    tabPanel("PCA and clustering"),
                    tabPanel("Time-series study"),
-                   tabPanel("Anomali/outlier")
+                   tabPanel("Anomalie/outlier")
                    )
 )

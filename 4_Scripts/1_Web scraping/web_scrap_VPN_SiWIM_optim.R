@@ -19,9 +19,9 @@ pwd <- 'yBgVLjS7tj'
 url <- 'https://vpn.siwim.si/siwim-s/login.php'
 values <- list(username = user, password = pwd)
 
-start_date <- as.Date("2017-11-23")
+start_date <- as.Date("2017-07-01")
 
-end_date <- as.Date("2018-02-23")
+end_date <- as.Date("2018-03-08")
 
 #Login
 POST(url, body = values)

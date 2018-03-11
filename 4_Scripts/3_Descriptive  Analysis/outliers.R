@@ -1,6 +1,15 @@
+install.packages("data.table")
+library(data.table)
+
+install.packages("dplyr")
+library(dplyr)
+
+install.packages("ggplot2")
+library(ggplot2)
+
 setwd("~/GitHub/SiWIM-project/4_Scripts/3_Descriptive  Analysis")
 
-don <- read.csv('../../2_Data/1_Sources/SiWIM_data_2017-07-01_to_2018-01-24.csv',header=T)
+don <- read.csv('../../2_Data/2_Retraitees/SiWIM_data_after_input_clusters.csv',header=T)
 dim(don)
 
 names(don)
@@ -8,17 +17,15 @@ names(don)
 # Anomalies/outliers en termes de poids et dimensions
 # Donc etape 1: creation de la table correspondante
 
-donPoidsDim <- don[,c("WGV","W1","W2","W3","W4","W5","W6","W7","W8",
-                      "W9","W10","W11","W12","W13","W14","W15","W16",
-                      "A1","A2","A3","A4","A5","A6","A7","A8","A9","A10",
-                      "A11","A12","A13","A14","A15")]
+don <- don[,c("Warning_flags","A1","A2","A3","A4","A5","A6","A7",
+                      "M1","M2","M3","M4","M5","M6","M7","M8","N", 
+                      "Reduced_chi_squared", "Vitesse", "MGV", "clusters_kmeans")]
 
-donPoidsDimAno <- don[,c("Warning_flags","WGV","W1","W2","W3","W4","W5","W6","W7","W8",
-                      "W9","W10","W11","W12","W13","W14","W15","W16",
-                      "A1","A2","A3","A4","A5","A6","A7","A8","A9","A10",
-                      "A11","A12","A13","A14","A15","Reduced_chi_squared")]
-dim(donPoidsDim)
-dim(donPoidsDimAno)
+dim(don)
+
+is.nan.data.frame <- function(x)
+  do.call(cbind, lapply(x, is.nan))
+don[is.nan(don)] <- 0
 
 # Approche univariee: poids total 
 # en dehors de 1.5 IQR, avec IQR: Inter Quartile Range: difference entre 75th et 25th quantiles
@@ -29,11 +36,35 @@ dim(donPoidsDimAno)
 # conf	the lower and upper extremes of the 'notch' (if(do.conf)). See the details.
 # out	the values of any data points which lie beyond the extremes of the whiskers (if(do.out)).
 
-outlier_values <- boxplot.stats(donPoidsDim$WGV)$out
-boxplot(donPoidsDim$WGV, main="Poids total", boxwex=0.1)
-length(outlier_values) 
+outlier_values <- boxplot.stats(don$MGV)$out
+boxplot(don$MGV, main="Poids total", boxwex=0.1)
+length(outlier_values) # 142 outliers
 
-outlier_values <- boxplot.stats(donPoidsDim$WGV, coeff=1.0)$out
+#function that takes in vector of data and a coefficient,
+#returns boolean vector if a certain point is an outlier or not
+check_outlier <- function(v, coef=1.5){
+  quantiles <- quantile(v,probs=c(0.25,0.75))
+  IQR <- quantiles[2]-quantiles[1]
+  res <- v < (quantiles[1]-coef*IQR)|v > (quantiles[2]+coef*IQR)
+  return(res)
+}
+
+#apply to our data
+
+don$outlier <- check_outlier(don$MGV)
+
+write.csv(don, file = "../../2_Data/2_Retraitees/SiWIM_data_after_input_clusters_outliers.csv")
+
+ggplot(don,aes(x=MGV,y=Reduced_chi_squared, colour=outlier))+
+  geom_boxplot()+
+  geom_text(aes(label=Warning_flags),hjust=-0.3)
+
+#plot
+ggplot(don,aes(x=outlier,y=Reduced_chi_squared, colour=Warning_flags))+
+   geom_boxplot()
+
+ggplot(don, aes(y=Warning_flags, x=Reduced_chi_squared, group=outlier)) +
+  geom_point(aes(shape=outlier, color=outlier))
 
 # mtext(paste("Outliers: ", paste(outlier_values, collapse=", ")), cex=0.6)
 # pour ecrire les valeurs des outliers, mais ici il y en a 314: trop
@@ -59,11 +90,11 @@ hist(donPoidsDim$W1, breaks=boundaries) # Probl�me des valeurs aberrantes
 
 # Approche bivariee: poids total ~longueur totale
 
-boxplot(WGV ~ A1+A2+A3+A4+A5+A6+A7+A8+A9+A10+A11+A12+A13+A14+A15, 
+boxplot(WGV ~ 0+A1+A2+A3+A4+A5+A6+A7+A8+A9+A10+A11+A12+A13+A14+A15, 
         data=donPoidsDim, main="Poids total en fonction de la longueur totale")
-# pas assez de mémoire
 
-boxplot(WGV ~ A1+A2+A3+A4+A5+A6+A7+A8+A9+A10+A11+A12+A13+A14+A15, 
+
+boxplot(WGV ~ 0+A1+A2+A3+A4+A5+A6+A7+A8+A9+A10+A11+A12+A13+A14+A15, 
         data=donPoidsDim[1:10,], main="Poids total en fonction de la longueur totale")
 
 boxplot(WGV ~ cut(A1+A2+A3+A4+A5+A6+A7+A8+A9+A10+A11+A12+A13+A14+A15, 
@@ -88,8 +119,7 @@ influential <- as.numeric(names(cooksd)[(cooksd > 4*mean(cooksd, na.rm=T))]) # L
 head(donPoidsDim[influential, ])
 
 # car package
-# fonction outlier, basé sur un modèle
-# Par exemple, le modèle mod ci-dessus
+# fonction outlier
 
 install.packages("car")
 library(car)

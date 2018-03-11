@@ -18,7 +18,7 @@ En comportement élastique linéaire, la déformation mesurée sur un pont au pe
 
 Par calcul inverse à partir des déformations, les poids et dimensions du trafic peuvent être évalués. Pour cela, il s'agit de minimiser: 
 
-$$E=\Sigma_{k=1}^T [M(t_k)-M^*(t_k)]^2$$
+$$E=\displaystyle{\Sigma_{k=1}^T [M(t_k)-M^*(t_k)]^2}$$
 où: 
 
 + $M(t_k)$est la réponse calculée,
@@ -27,12 +27,12 @@ où:
 ## Les composants du B-WIM
 
 Un système de pesage par pont instrumenté sera ainsi constitué des unités suivantes: 
-. Capteurs de déformations, 
-. sonde de température, 
-. centrale d'acquisition et de calcul, 
-. borne serveur qui communique les données calulées à un serveur accessible à distance, 
-. caméra, 
-. et éléments de connectique (câbles).
++ Capteurs de déformations, 
++ sonde de température, 
++ centrale d'acquisition et de calcul, 
++ borne serveur qui communique les données calulées à un serveur accessible à distance, 
++ caméra, 
++ et éléments de connectique (câbles).
 
 ![Capteur de déformation.](images/capteur.png)
 ![Unité d'acquisition et de calcul.](images/centrale.png)
@@ -61,4 +61,4 @@ Pour cela, une détection des otuliers a été réalisée, avec mise en lien ave
 
 + Jérémy Arthaud,
 + Frédéric Gelot,
-+ Franzsika Schmidt. 
++ Franziska Schmidt. 
