@@ -502,10 +502,6 @@ ggplot(don_PCA_clusters, aes(x=Dim.1, y=Dim.2, color=clusters_cah_mixte)) + geom
     labs(title ="Représentation des camions sur le premier plan factoriel")
 ```
 
-```{r}
-# Description des catégories
-```
-
 
 ## Partitionnement : K-means sur composantes principales
 
@@ -546,7 +542,7 @@ ggplot(don_PCA_clusters, aes(x=Dim.1, y=Dim.2, color=clusters_kmeans)) + geom_po
 Un medoïde est le représentant le plus central d'une classe.
 L'algorithme des k-medoïdes réalise un partitionnement plus robuste vis à vis des données aberrantes, que celui des k-means.
 
-Il s'agit d'un extension aux méthodes k-medoides pour traiter de grands jeux de données (plusieursmilliers d'observations). Elle est donc adaptée à notre contexte :
+Il s'agit d'un extension aux méthodes k-medoides pour traiter de grands jeux de données (plusieurs milliers d'observations). Elle est donc adaptée à notre contexte :
 
 ```{r}
 # On applique la méthode CLARA sur 3 groupes
@@ -568,16 +564,29 @@ ggplot(don_PCA_clusters, aes(x=Dim.1, y=Dim.2, color=clusters_clara)) + geom_poi
 
 PAM (Partitioning Around Medoid) est une implémentation populaire mais nécessite de calculer les distances entre chaque individus pris deux à deux et pénalise ainsi la scalabilité que nous rencontrons dans notre cas.
 
-## Partitionnement basé sur densité : DBscan / Optics sur composantes principales
+## Partitionnement basé sur densité : DBSCAN sur composantes principales
 
 DBSCAN est un algorithme de partitionnement de type "densité". Il s'appuie sur la densité des données pour réaliser le partitionnement. 
+L'algorithme utilise deux parametres : la distance epsilon et le nombre de points minimum devant se trouver dans un rayon epsilon pour considerer ces points comme un cluster.
+
+Afin de déterminer la valeur optimale d'epsilon, nous utilisons les distances des k plus proches voisins d'une matrice de points.L'idée est de calculer la moyenne des distances de chaque point à ces k plus proches voisins.
+La valeur de k sera spécifiée par l'utilisateur et correspond au nombre de points minimum (nous choisissons k = nombre dimension du data set + 1).
+Ensuite les k-distances sont affichés graphiquement dans l'ordre croissant. Le but est de trouver le "genou" correspondant au paramètre optimal epsilon.
+
+```{r}
+# Determination de la valeur epsilon optimale, k = nombre de dimension + 1
+dbscan::kNNdistplot(don_PCA_clusters[,c("Dim.1","Dim.2","Dim.3","Dim.4")], k =  5)
+abline(h=0.75, col = "red", lty=2)
+
+```
+
+Nous executons ensuite DBSCAN avec les paramètres eps et minPts de l'heuristique précédente.
 
 
 ```{r}
-# utilise deux parametres : 
-# distance epsilon et le nb de points minimum devant se trouver dans #un rayon epsilon pour considerer ces points comme un cluster
+# DBSCAN
 set.seed(123)
-res_dbscan <- dbscan::dbscan(don_PCA_clusters[,c("Dim.1","Dim.2","Dim.3","Dim.4")], eps = 0.25, minPts = 100)
+res_dbscan <- dbscan::dbscan(don_PCA_clusters[,c("Dim.1","Dim.2","Dim.3","Dim.4")], eps = 0.75, minPts = 5)
 
 # Nous rajoutons la variable de classe au jeu de données contenant les axes factoriels
 don_PCA_clusters$clusters_dbscan <- as.factor(res_dbscan$cluster)
@@ -589,26 +598,67 @@ ggplot(don_PCA_clusters, aes(x=Dim.1, y=Dim.2, color=clusters_dbscan)) + geom_po
     labs(title ="Représentation des camions sur le premier plan factoriel")
 ```
 
-L'algorithme est compliqué à configurer. 
-En jouant sur les deux paramètres, on n'obtient pas de regroupement visuellement satisfaisant.
+L'algorithme propose ici 7 clusters.
 Nous essaierons néanmoins d'interpréter les clusters (voir ci après)
+
+## Partitionnement basé sur densité : OPTICS sur composantes principales
+
+Cet algorithme est similaire à DBSCAN et élimine son principal défaut : l'impossibilité de détecter des partitions de densités différentes
+
+
+```{r}
+# OPTICS
+set.seed(123)
+res_optics <- optics(don_PCA_clusters[,c("Dim.1","Dim.2","Dim.3","Dim.4")], eps = 10, minPts = 10)
+
+```
 
 
 ##  Méthodes neuronales : cartes auto-adaptatives de Kohonen (SOM)
 
 ```{r}
-
+# A faire
 ```
 
 ##  Interprétation des classes
 
 Nous interpretons les classes construites dans chaque méthode. L'idée est de dégager une interprétation commune, favorisant l'utilité métier. 
 
+
+Mais avant cela, nous rajoutons au jeu de données quantitatives initiales, les classes :
+construite via chacune des méthodes :
+
 ```{r}
-# Interpretation des classes
-catdes(don_PCA_clusters,num.var = 5)
+# Rajout des classes dans le jeu de variables quanti (pour l'interprétation) et d'analyse final
+
+varquanti_clusters <- cbind.data.frame(varquanti2,clusters_kmeans = don_PCA_clusters[,c("clusters_kmeans")])
+siwim_final2 <- cbind.data.frame(siwim_final,don_PCA_clusters[,c("clusters_cah_mixte","clusters_kmeans","clusters_clara")])
+
 ```
 
+Nous utilisons la fonction `catdes` du package `FactoMiner` nous aidant à interpréter les classes :
+
+```{r}
+# Interpretation des classes
+catdes(varquanti_clusters[1:7],num.var = 8)
+```
+
+De manière générale, nous accordons de l'importance à l'interprétabilité des classes. Nous privilégerons ainsi une partition la facilitant.
+
+
+## Rajout d'une variable de classe au jeu de donnée principal
+
+```{r}
+# Rajout variable
+siwim_data_after_input_clusters <- cbind.data.frame(siwim_imputed,clusters_kmeans = don_PCA_clusters[,c("clusters_kmeans")])
+```
+
+On écrit ensuite le fichier modifié (comportant la colonne de clusters en plus dans le jeu de donné principal avec les données imputées).
+
+```{r}
+# Export
+write.csv(siwim_data_after_input_clusters, file = "2_Data/2_Retraitees/SiWIM_data_after_input_clusters.csv")
+```
 
 
 Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
