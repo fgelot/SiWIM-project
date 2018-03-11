@@ -1,5 +1,5 @@
 ---
-title: "Approche adoptÈe pour la prÈvision de flux sur les donneÈs SIWIM"
+title: "Approche adopt√©e pour la pr√©vision de flux sur les donne√©s SIWIM"
 output: 
   html_document:
     df_print: paged
@@ -8,22 +8,23 @@ output:
 ```{r "setup", include=FALSE}
 # Configuration locale du chemin du projet SIWIM :
 knitr::opts_knit$set(root.dir = normalizePath("D:/Dropbox/Data science/Formation CEPE/Projet/GitHub/SiWIM-project")) 
+options(encoding = 'UTF-8')
 ```
 
 # Introduction
 
-L'objet de cette page est de prÈsenter l'approche adoptÈe pour analyser les donneÈs temporelles
-associÈes aux camions et captÈes par le systËme SIWIM, puis pour construire le meilleur modËle 
-de prÈdiction possible.
+L'objet de cette page est de pr√©senter l'approche adopt√©e pour analyser les donne√©s temporelles
+associ√©es aux camions et capt√©es par le syst√®me SIWIM, puis pour construire le meilleur mod√®le 
+de pr√©diction possible.
 
 
-```{r "librairies", echo=FALSE, warning=FALSE, message=FALSE}
+```{r "librairies", include=FALSE}
 # chargement des librairies 
 
-library(forecast) #prÈdiction sur les modËles classiques
-library(ggplot2) #graphiques sur les donnÈes
+library(forecast) #pr√©diction sur les mod√®les classiques
+library(ggplot2) #graphiques sur les donn√©es
 library(plotly)
-library(data.table) #manipulation des donnÈes
+library(data.table) #manipulation des donn√©es
 library(xts)# extensible time series
 library(dygraphs) # Nice graphs for time series
 library(imputeTS) #Missing values in time series
@@ -35,9 +36,8 @@ library(scales)
 
 ```
 
-Nous choisissons de poursuivre nos analyses sur la base du jeu de donn√©es dont les donn√©es manquantes ont √©t√© imput√©es :
 
-```{r "chargement donnees", echo=FALSE, message=FALSE, warning=FALSE}
+```{r "chargement donnees", include=FALSE}
 
 # Chargement
 siwim_data <- fread("2_Data/2_Retraitees/SiWIM_data_after_input.csv")
@@ -52,7 +52,6 @@ siwim_data <- fread("2_Data/2_Retraitees/SiWIM_data_after_input.csv")
 #   kable_styling()
 
 ```
-
 
 
 ```{r "data transformation", echo=FALSE, message=FALSE, warning=FALSE}
@@ -73,7 +72,7 @@ cols <- c(
 
 siwim_data[, (cols) := lapply(.SD, function(x) as.factor(x)), .SDcols=cols]
 
-# Heure au format numÈrique
+# Heure au format num√©rique
 siwim_data[,Heure_num := as.numeric(Heure)]
 
 #Delete unuseful columns
@@ -95,11 +94,11 @@ siwim_data[, (useless_cols) := NULL]
 #   kable_styling()
 ```
 
-# Calcul des donnÈes avec le pas temporel donnÈ
+# 1. Calcul des donn√©es avec le pas temporel donn√©
 
-Nous avons dÈcider de partir sur une prÈvision dans l'heure, donc nous allons agrÈger les donnnÈes par date et par heure. Par cette opÈration, nous allons compter le nombre de camions, sommer les poids et les distances entre esseiux des camions et enfin prendre la moyenne de tempÈrature, de la vitesse des camions.
+Nous avons d√©cid√© de partir sur une pr√©vision dans l'heure, donc nous allons agr√©ger les donnn√©es par date et par heure. Par cette op√©ration, nous allons compter le nombre de camions, sommer les poids et les distances entre esseiux des camions et enfin prendre la moyenne de temp√©rature, de la vitesse des camions.
 
-Nous crÈeons ensuite un certain nombre de variables catÈgorielles et numÈriques autour du temps (annÈe, mois, semaine, jour, jour de la semaine.
+Nous cr√©eons ensuite un certain nombre de variables cat√©gorielles et num√©riques autour du temps (ann√©e, mois, semaine, jour, jour de la semaine.
 
 ```{r "agg data", echo=FALSE, warning=FALSE, message=FALSE}
 ## Scaling data by day and hour (choosen time window)
@@ -133,7 +132,7 @@ siwim_data_hours[, ':=' (Annee =  as.numeric(format(as.Date(Date), format = "%Y"
                          Heure_num = as.numeric(Heure)
                          )]
 
-#Variable catÈgorielle du jour de la semaine
+#Variable cat√©gorielle du jour de la semaine
 siwim_data_hours[, Jour_semaine := factor(weekdays(Date), 
                                           levels = c("lundi", "mardi", "mercredi",
                                                      "jeudi", "vendredi", "samedi",
@@ -147,7 +146,7 @@ siwim_data_hours[, time_step := as.POSIXct(paste(as.character(Date), paste(Heure
 
 ```
 
-Voici une rÈprsentation graphique des diffÈrentes donnÈes :
+Voici une r√©prsentation graphique des diff√©rentes donn√©es :
 
 
 ```{r "time series", echo=FALSE, warning=FALSE, message=FALSE}
@@ -164,7 +163,7 @@ Quelques indications de la disribution par jour et par heure.
 #box plot par mois
 #boxplot(Count ~ Mois_annee, data = siwim_data_hours)
 ggplot(siwim_data_hours, aes(x=Mois_annee, y=Count, fill=Mois_annee)) +
-  geom_boxplot() + scale_x_discrete(limits=c("juillet", "ao˚t", "septembre", "octobre", "novembre"))
+  geom_boxplot() + scale_x_discrete(limits=c("juillet", "ao√ªt", "septembre", "octobre", "novembre"))
 
 
 #box plot par jour de la semaine
@@ -177,15 +176,21 @@ ggplot(siwim_data_hours, aes(x=Jour_semaine, y=Count, fill=Jour_semaine)) +
 ggplot(siwim_data_hours, aes(x=Heure, y=Count, fill=Heure)) +
   geom_boxplot()
 
+
+#Box plot par Heure et semaine combin√©
+#boxplot(Count ~ Heure, data = siwim_data_hours)
+ggplot(siwim_data_hours, aes(x=interaction(Heure, Jour_semaine) , y=Count, fill=interaction(Heure, Jour_semaine))) +
+  geom_boxplot()
+
 ```
 
 
 
-# Geston des valeurs manquantes (dates et heures)
+# 2. Geston des valeurs manquantes (dates et heures)
 
-Plusieurs pÈriodes montrent un manque de donnÈes d˚ surement ‡ une dÈfection du systËme SIWIM.
-L'idee de reconstituer les valeurs de frÈquences par interpolation linÈaire ou spline.
-Pou cela, nous allons complÈter la sÈrie temporelle par les dates et heures manquantes.
+Plusieurs p√©riodes montrent un manque de donn√©es d√ª surement √† une d√©fection du syst√®me SIWIM.
+L'idee de reconstituer les valeurs de fr√©quences par interpolation lin√©aire ou spline.
+Pou cela, nous allons compl√©ter la s√©rie temporelle par les dates et heures manquantes.
 
 
 ```{r "missing dates", echo=FALSE}
@@ -198,15 +203,15 @@ missing_sequence <- full_sequence[!(full_sequence %in% siwim_data_hours$time_ste
 
 # missing_sequence[sample(.N,3)]
 #sapply(missing_sequence[], sample, 10)
-n_samples <- sample(1:length(missing_sequence), 30, replace = TRUE)
-kable(missing_sequence[n_samples])
+n_samples <- sample(1:length(missing_sequence), 5, replace = TRUE)
+kable(missing_sequence[n_samples], col.names = "Dates et heures manquantes")
 
 ```
 
-Nous construisons un nouveau data set uniquement pour les dates et heures manquantes. Les donnÈes catÈgorielles et numÈriques liÈes au temps sont dÈduites en mÍme temps.
-Enfin, nous fusionnons le dataset de donnÈes existantes et celui de donnÈes manquantes.
+Nous construisons un nouveau data set uniquement pour les dates et heures manquantes. Les donn√©es cat√©gorielles et num√©riques li√©es au temps sont d√©duites en m√™me temps.
+Enfin, nous fusionnons le dataset de donn√©es existantes et celui de donn√©es manquantes.
 
-```{r "full dates", echo=FALSE, warning=FALSE, message=FALSE}
+```{r "full dates", include=FALSE}
 siwim_data_hours_missing <- data.table(time_step = missing_sequence, 
                                        Date =  as.Date(strftime(missing_sequence, format = "%Y-%m-%d")),
                                        Annee = as.numeric(strftime(missing_sequence, format = "%Y")),
@@ -217,14 +222,14 @@ siwim_data_hours_missing <- data.table(time_step = missing_sequence,
 
 siwim_data_hours_missing[, Jour_semaine := factor(weekdays(Date))]
 
-## DonnÈes existantes et manquantes
+## Donn√©es existantes et manquantes
 siwim_data_hours_full <- rbindlist(list(siwim_data_hours, siwim_data_hours_missing), fill = T)
 
 ```
 
-Nous rÈalisons ensuite une interpolation linÈaire et spline sur le dataset complet.
+Nous r√©alisons ensuite une interpolation lin√©aire et spline sur le dataset complet.
 
-```{r "interpolations", echo=FALSE}
+```{r "interpolations", echo=FALSE, strip.white=FALSE}
 siwim_data_hours_count_full_2 <- na.interpolation(siwim_data_hours_full$Count)
 siwim_data_hours_count_full_3 <- na.interpolation(siwim_data_hours_full$Count, option = "spline")
 
@@ -235,35 +240,37 @@ siwim_data_dt_full <- data.table(time_step = siwim_data_hours_full$time_step,
 ## Graphique des 2 interpolations
 df <- melt(siwim_data_dt_full[, c("time_step", "full_interp_lm", 
                                   "full_interp_spline")], id="time_step")
-ggplot(df) + geom_line(aes(x=time_step, y=value, color=variable))  + facet_wrap( ~ variable, scales="free")
+ggplot(df) + geom_line(aes(x=time_step, y=value, color=variable))  + facet_grid( ~ variable, scales="free") +
+  labs(x = "Temps", y = "Fr√©quence",
+       title = "Comparaison des interpolations")
 
 
 ```
 
-L'interpolation spline semble mieux complÈter la sÈrie temporelle.
+L'interpolation spline semble mieux compl√©ter la s√©rie temporelle.
 
-# ModËles classiques de sÈries temporelles
+# 3. Mod√®les classiques de s√©ries temporelles
 
-Avant d'utiliser d'appliquer un modËle classique sur les sÈries temporelles, nous devons vÈrifier si elle est stationnaire. Une sÈrie temporelle stationnaire doit satisfaire 3 critËres :
-+    sa moyenne doit Ítre constante dans le temps
-+    sa variance doit Ítre indÈpendante du temps
-+    la covariance entre termes doit Ítre indÈpendante du temps.
+Avant d'utiliser d'appliquer un mod√®le classique sur les s√©ries temporelles, nous devons v√©rifier si elle est stationnaire. Une s√©rie temporelle stationnaire doit satisfaire 3 crit√®res :
++    sa moyenne doit √™tre constante dans le temps
++    sa variance doit √™tre ind√©pendante du temps
++    la covariance entre termes doit √™tre ind√©pendante du temps.
 
-## Le test de Dickey-fuller
+## 3.1 Le test de Dickey-fuller
 
-Le test de Dickey-fuller a pour hypothËse $H_0$ qu'une racine unitaire est prÈsente dans une modËle auto-regressif d'ordre 1. L'hypothËse alternative est la stationnaritÈ de la sÈrie temporelle.
+Le test de Dickey-fuller a pour hypoth√®se $H_0$ qu'une racine unitaire est pr√©sente dans une mod√®le auto-regressif d'ordre 1. L'hypoth√®se alternative est la stationnarit√© de la s√©rie temporelle.
 
-$y_t = \rho y_{t-1} + u_t$. Une racine unitaire est prÈsente si $\rho = 1$.
+$y_t = \rho y_{t-1} + u_t$. Une racine unitaire est pr√©sente si $\rho = 1$.
 
-Cette Èquation est reformulÈe par diffÈrence de $y_t$ avec $y_{t-1}$ :
+Cette √©quation est reformul√©e par diff√©rence de $y_t$ avec $y_{t-1}$ :
 $\nabla y_t = (\rho - 1) y_{t-1} + u_t = \delta y_{t-1} + u_t$
 
-L'hypothËse $H_0$ devient : $\delta = 0$. 2 autres versions du test existent :
+L'hypoth√®se $H_0$ devient : $\delta = 0$. 2 autres versions du test existent :
 +     avec une constante intiale : $y_t = a_0 + \rho y_{t-1} + u_t$
 +     avec une tendance temporelle :  $y_t = a_0 + a_1 t+ \rho y_{t-1} + u_t$
 
 
-Le test augmentÈ de Dickey-fuller supprime tous les effets structurels dus aux autocorrelations d'ordre supÈrieur ‡ 1.
+Le test augment√© de Dickey-fuller supprime tous les effets structurels dus aux autocorrelations d'ordre sup√©rieur √† 1.
 
 ```{r "test Dickey-fuller", echo=FALSE}
 
@@ -275,7 +282,7 @@ n <- length(z)
 z.diff <- embed(z, lags+1)[,1]
 z.lag.1 <- X[(lags+1):n]
 
-summary(lm(z.diff~0+z.lag.1 ))
+#summary(lm(z.diff~0+z.lag.1 ))
 
 
 #Augmented Dickey Fuller
@@ -287,55 +294,50 @@ z.lag.1 <- X[(lags+1):n]
 k <- lags + 1
 z.diff.lag <- embed(z, lags+1)[, 2:k]
 
-summary(lm(z.diff~0+z.lag.1+z.diff.lag ))
+#summary(lm(z.diff~0+z.lag.1+z.diff.lag ))
 
 #Augmented Dickey Fuller with trend and drift
-summary(lm(z.diff~1+z.lag.1+z.diff.lag ))
+#summary(lm(z.diff~1+z.lag.1+z.diff.lag ))
 
 time <- 1:length(z.diff)
 
 #Augmented Dickey Fuller with trend and drift and time trend
-summary(lm(z.diff~1+time+z.lag.1+z.diff.lag ))
+#summary(lm(z.diff~1+time+z.lag.1+z.diff.lag ))
 
 
 # with tseries function
 
 #Simple Dickey_fuller test
-adf.test(siwim_data_hours$Count, k = 0)
+#adf.test(siwim_data_hours$Count, k = 0)
 
 #Augmented Dickey-fuller test
 adf.test(siwim_data_hours$Count, k = 168)
 
-
-#Number of differences required for a stationary series
-ndiffs(X)
 ```
 
+Le nombre de diff√©rences requises pour que la s√©rie soit stationnaire est de $`r ndiffs(X)`$
 
-## Analyse des autocorrÈlations et autocorrÈlations partielles
+## 3.2 Analyse des autocorr√©lations et autocorr√©lations partielles
 
-La fonction d'autocorrelation (ACF) mesure la correlation entre la sÈrie temporelle et elle-mÍme dÈcalÈe dans le temps (lags t-1, t-2, etc.). Par exemple, pour le lag d'ordre 5, ACF compare la sÈrie temporelle ‡ l'instant t avec la sÈrie temporelle ‡ l'instant t-5.
+La fonction d'autocorrelation (ACF) mesure la correlation entre la s√©rie temporelle et elle-m√™me d√©cal√©e dans le temps (lags t-1, t-2, etc.). Par exemple, pour le lag d'ordre 5, ACF compare la s√©rie temporelle √† l'instant t avec la s√©rie temporelle √† l'instant t-5.
 
-Pour une sÈrie de type moyenne mobile de lag n, il n'y aura aucune corrÈlation entre $x(t)$ et $x(t-n-1)$. Donc, le graphique d'autocorrÈlation passe en dessous d'une certaine valeur au $n^{Ëme}$ lag. De cette maniËre, on trouve l'ordre idÈal pour une sÈrie de type MA (Moving average). 
+Pour une s√©rie de type moyenne mobile de lag n, il n'y aura aucune corr√©lation entre $x(t)$ et $x(t-n-1)$. Donc, le graphique d'autocorr√©lation passe en dessous d'une certaine valeur au $n^{√®me}$ lag. De cette mani√®re, on trouve l'ordre id√©al pour une s√©rie de type MA (Moving average). 
 
 
-```{r "ACF", echo=FALSE}
+```{r "ACF", echo=FALSE, strip.white=FALSE}
 acf(X)
 ```
 
-On peut 
+La fonction d'autocorr√©lation partielle mesure la corr√©lation entre une s√©rie temporelle et elle-m√™me d√©cal√©e dans le temps, apr√®s avoir √©limin√© les varaitions d√©j√† expliqu√©es par les comparaisons interm√©diaires (dus aux lags pr√©c√©dents). PAr exemple, pour le lag d'ordre 5, elle va comparer la corr√©lation avec l'instant t, mais elle supprime les effets ad√®j√† expliqu√©s par les lags 1 √† 4.
 
-La fonction d'autocorrÈlation partielle mesure la corrÈlation entre une sÈrie temporelle et elle-mÍme dÈcalÈe dans le temps, aprËs avoir ÈliminÈ les varaitions dÈj‡ expliquÈes par les comparaisons intermÈdiaires (dus aux lags prÈcÈdents). PAr exemple, pour le lag d'ordre 5, elle va comparer la corrÈlation avec l'instant t, mais elle supprime les effets adËj‡ expliquÈs par les lags 1 ‡ 4.
+A l'instar du graphique ACF, PACF passera en dessous d'une certaine valeur apr√®s un certain lag qui donne l'ordre d'une s√©rie de type AR (auto-regressive). Par exemple, si on prendre une s√©rie AR d'ordre 1 et si on exclut l'effet du lag d'ordre 1 ($x(t-1)$), le lag d'ordre 2 ($x(t-2)$)  est ind√©pendant de $x(t)$. Donc la fonction d'autocorr√©lation partielle diminuera rapidement apr√®s le lag d'ordre 1.
 
-A l'instar du graphique ACF, PACF passera en dessous d'une certaine valeur aprËs un certain lag qui donne l'ordre d'une sÈrie de type AR (auto-regressive). Par exemple, si on prendre une sÈrie AR d'ordre 1 et si on exclut l'effet du lag d'ordre 1 ($x(t-1)$), le lag d'ordre 2 ($x(t-2)$)  est indÈpendant de $x(t)$. Donc la fonction d'autocorrÈlation partielle diminuera rapidement aprËs le lag d'ordre 1.
-
-```{r "PACF", echo=FALSE}
+```{r "PACF", echo=FALSE, strip.white=FALSE}
 pacf(X)
 ```
 On peut constater que le graphique ACF nous indique un ordre MA de 8 et le graphique PACF nous indique un ordre AR de 1.
 
-
-## ARIMA : Auto-regressive integrated moving average
+## 3.3 ARIMA : Auto-regressive integrated moving average
 
 Number of AR (Auto-Regressive) terms (p): AR terms are just lags of dependent variable.
 For instance if p is 5, the predictors for x(t) will be x(t-1)..x(t-5).
@@ -353,7 +355,7 @@ p - The lag value where the PACF chart crosses the upper confidence interval for
 
 $p = 1$ and $q = 8$
 
-```{r "funggcast", echo=FALSE, message=FALSE, warning=FALSE}
+```{r "funggcast", include=FALSE}
 
 #--Produces a data.frame with the Source Data+Training Data, Fitted Values+Forecast Values, forecast data Confidence Intervals
 funggcast<-function(dn,fcast){ 
@@ -385,9 +387,9 @@ funggcast<-function(dn,fcast){
 
 ```
 
+### 3.3.1 ARIMA autoregressif d'ordre 1
 
-
-```{r "ARIMA AR"}
+```{r "ARIMA AR", echo=FALSE}
 # AR model 
 
 # forecast window
@@ -429,12 +431,12 @@ dygraph(xts(x=pd_AR[,-c(1,5,6)], order.by = pd_AR[,1]), "Frequence des camions -
 
 ```
 
+### 3.3.2 ARIMA moyenne mobile d'ordre 1
 
-
-```{r "ARIMA MA"}
+```{r "ARIMA MA", echo=FALSE}
 # MA model
 model_MA <- arima(yt, order = c(0,0,8))
-accuracy(model_MA)
+# accuracy(model_MA)
 
 pd_MA <- funggcast(x3, forecast(model_MA, h = f_win))
 
@@ -452,11 +454,14 @@ dygraph(xts(x=pd_MA[,-c(1,5,6)], order.by = pd_MA[,1]), "Frequence des camions -
 
 ```
 
-```{r "ARIMA ARMA"}
+### 3.3.3 ARIMA autoregressif d'ordre 1 et moyenne mobile d'ordre 8
+
+
+```{r "ARIMA ARMA", echo=FALSE}
 
 # Composite model
 model_ARMA <- arima(yt, order = c(1,0,8))
-accuracy(model_ARMA)
+# accuracy(model_ARMA)
 
 #autoplot(forecast(model_ARMA, 168))
 
@@ -474,12 +479,14 @@ dygraph(xts(x=pd_ARMA[,-c(1,5,6)], order.by = pd_ARMA[,1]), "Frequence des camio
 
 ```
 
-```{r "auto ARIMA"}
+### 3.3.4 ARIMA auto
+
+```{r "auto ARIMA", echo=FALSE}
 
 # Auto ARIMA model
 model_auto_ARMA <- auto.arima(yt)
 
-accuracy(model_auto_ARMA)
+# accuracy(model_auto_ARMA)
 
 #autoplot(forecast(model_auto_ARMA, 168))
 
@@ -496,7 +503,9 @@ dygraph(xts(x=pd_auto_ARIMA[,-c(1,5,6)], order.by = pd_auto_ARIMA[,1]), "Frequen
 # autoplot(pacf(model_auto_ARMA$residuals))
 ```
 
-```{r "ARIMA season"}
+### 3.3.5 ARIMA avec une saisonnalit√© (24 heures)
+
+```{r "ARIMA season", echo=FALSE}
 
 ## auto arima with season
 
@@ -504,7 +513,7 @@ period <- 24 #first season
 
 model_auto_ARMA_seas <- auto.arima(ts(data=yt,frequency = period))
 
-accuracy(model_auto_ARMA_seas)
+# accuracy(model_auto_ARMA_seas)
 
 #summary(model_auto_ARMA_seas)
 #autoplot(forecast(model_auto_ARMA_seas, 168))
@@ -523,7 +532,9 @@ dygraph(xts(x=pd_auto_ARIMA_seas[,-c(1,5,6)], order.by = pd_auto_ARIMA_seas[,1])
 
 ```
 
-```{r "ARIMA double seasons"}
+### 3.3.6 ARIMA avec double saisonnalit√© (24 heures et 7 jours)
+
+```{r "ARIMA double seasons", echo=FALSE}
 
 ## auto arima with double seasons
 
@@ -532,7 +543,7 @@ x6 <- lag(lag(yt,k = 24), k =7)
 
 model_auto_ARMA_double <- auto.arima(x6)
 
-accuracy(model_auto_ARMA_double)
+# accuracy(model_auto_ARMA_double)
 
 #autoplot(forecast(model_auto_ARMA_double, 168))
 
@@ -551,29 +562,18 @@ dygraph(xts(x=pd_auto_ARIMA_double_seas[,-c(1,5,6)], order.by = pd_auto_ARIMA_do
 
 ```
 
-## RÈsultats des erreurs par modËle ARIMA
+### 3.3.7 R√©sultats des erreurs par mod√®le ARIMA
 
-```{r}
-rbind.data.frame("ModËle AR" = accuracy(model_AR),
-"ModËle MA" = accuracy(model_MA),
-"ModËle ARMA" = accuracy(model_ARMA),
-"ModËle auto ARIMA" = accuracy(model_auto_ARMA),
-"ModËle ARIMA avec saison" = accuracy(model_auto_ARMA_seas),
-"ModËle ARIMA avec double saison" = accuracy(model_auto_ARMA_double))  %>% kable()
+```{r "Results ARIMA", echo = FALSE}
+rbind.data.frame("Mod√®le AR" = accuracy(model_AR),
+"Mod√®le MA" = accuracy(model_MA),
+"Mod√®le ARMA" = accuracy(model_ARMA),
+"Mod√®le auto ARIMA" = accuracy(model_auto_ARMA),
+"Mod√®le ARIMA avec saison" = accuracy(model_auto_ARMA_seas),
+"Mod√®le ARIMA avec double saison" = accuracy(model_auto_ARMA_double))  %>% kable()
 ```
 
-
-
-```{r "decompostion temporelle"}
-
-ts_Y <- as.ts(x3)
-dekom <- stl(ts_Y, s.window = "periodic", robust = TRUE)
-autoplot(dekom)
-
-```
-
-
-## Holt winters & Exponential smoothing
+## 3.4 Holt winters or Exponential smoothing
 
 ```{r "Holt winters", echo=FALSE, message=FALSE, warning=FALSE}
 #Simple exponential smoothing
@@ -606,81 +606,29 @@ dygraph(xts(x=pd_hw_es[,-c(1,5,6)], order.by = pd_hw_es[,1]), "Frequence des cam
 
 ```
 
-### RÈsultats des modËles de 
+### 3.4.1 R√©sultats des mod√®les Exponential Smoothing
 
-```{r}
+```{r echo=FALSE}
 rbind.data.frame("Sipmle Expoential Smoothing" = accuracy(forecast(siwim_data_hw_ses, h = f_win)), "Expoential Smoothing" =
 accuracy(forecast(siwim_data_hw_es, h = f_win)))  %>% kable()
 ```
 
-Test d'autocorrÈlation d'ordre supÈrieur ‡ 1 sur les rÈsidus :
+# 4. Mod√®les d'apprentissage automatique
 
+## 4.1 Premier mod√®le lin√©aire simple
 
-```{r}
-
-#Box test sur forecast
-Box.test(forecast(siwim_data_hw_es, h = f_win)$residuals, lag = f_win, type = "Ljung-Box")
-
-```
-
-
-
-## Double saisonnalitÈ
-
-```{r "double saisonnalite"}
-x2 <- msts(siwim_data_hours$Count, seasonal.periods = c(24, 24*7), start = 2017 + 07/12 + 5/365 + 23/8760)
-
-# double_hw <- dshw(x2,24, 24*7)
-# frequency(x2)
-
-plot(x2)
-# dygraph(x2, "Frequence des camions - Double saisonnalitÈ") %>%
-#   dyRangeSelector()
-
-seasonaldecomp <- tbats(x2)
-plot(seasonaldecomp)
-
-
-accuracy(seasonaldecomp)
-
-plot(forecast(seasonaldecomp, 168 *4,level = 0.5))
-
-seasonaldecomp2 <- tbats(siwim_data_hours$Count)
-plot(seasonaldecomp2)
-
-
-accuracy(seasonaldecomp2)
-
-plot(forecast(seasonaldecomp2, 168 *4))
-
-```
-
-# ModËles linÈaires de base
-
-## Premier modËle simple
-
-```{r "first simple model"}
+```{r "first simple model", echo=FALSE}
 #First simple linear model
 
 simple_model_freq <- lm(Count ~ 0 + Heure + Jour_semaine, data = siwim_data_hours)
 
-summary(simple_model_freq)
+#summary(simple_model_freq)
 
 plot(
-  simple_model_freq$coefficients[1:23], type = "h", xlab = "Heure", ylab = "coefficient")
+  simple_model_freq$coefficients[1:23], type = "h", 
+  xlab = "Heure", ylab = "coefficients", main = "Importance des heures")
 
-# simple_model_freq$residuals
-
-#Diagnostic de la regression
-#plot(siwim_data_hours$Heure,rstudent(simple_model_freq))
-
-#mesusres d'influence du mod√®le dont hii
-mes <- influence.measures(simple_model_freq)
-
-#graph des hii
-plot(sort(mes$infmat[,"hat"]), type ="h")
-
-#Prediction du modËle simple
+#Prediction du mod√®le simple
 pred <- predict(simple_model_freq, cbind.data.frame(Heure = siwim_data_hours$Heure, Mois_annee = siwim_data_hours$Mois_annee, Jour_semaine = siwim_data_hours$Jour_semaine))
 
 
@@ -696,62 +644,19 @@ datas[, type := rep(c("Real", "Fitted"), each = nrow(siwim_data_hours))]
 ggplot(data = datas, aes(time_step, Count, group = type, colour = type)) +
   geom_line(size = 0.8) +
   theme_bw() +
-  labs(x = "Time", y = "Frequency",
-       title = "Fit from simple MLR")
-
-## Visu for residuals
-
-ggplot(data = data.table(Fitted_values = simple_model_freq$fitted.values,
-                         Residuals = simple_model_freq$residuals),
-       aes(Fitted_values, Residuals)) +
-  geom_point(size = 1.7) +
-  geom_smooth() +
-  geom_hline(yintercept = 0, color = "red", size = 1) +
-  labs(title = "Fitted values vs Residuals")
-
-## Function to visualize normaliy of residuals
-ggQQ <- function(lm){
-  # extract standardized residuals from the fit
-  d <- data.frame(std.resid = rstandard(lm))
-  # calculate 1Q/4Q line
-  y <- quantile(d$std.resid[!is.na(d$std.resid)], c(0.25, 0.75))
-  x <- qnorm(c(0.25, 0.75))
-  slope <- diff(y)/diff(x)
-  int <- y[1L] - slope * x[1L]
-  
-  p <- ggplot(data = d, aes(sample = std.resid)) +
-    stat_qq(shape = 1, size = 3) +         # open circles
-    labs(title = "Normal Q-Q",             # plot title
-         x = "Theoretical Quantiles",      # x-axis label
-         y = "Standardized Residuals") +   # y-axis label
-    geom_abline(slope = slope, intercept = int, linetype = "dashed",
-                size = 1, col = "firebrick1") # dashed reference line
-  return(p)
-}
-
-ggQQ(simple_model_freq)
+  labs(x = "Temps", y = "Fr√©quence",
+       title = "R√©el vs pr√©dictions - mod√®le lin√©aire simple")
 
 ```
 
+## 4.2 Mod√®le lin√©aire avec interactions
 
-## ModËle avec interactions
-
-```{r "modele interactions"}
+```{r "modele interactions", echo=FALSE}
 
 ################# Linear models with interactions #####################################
 model_interact_freq <- lm(Count ~ 0 + Heure + Jour_semaine + Heure:Jour_semaine, 
                           data = siwim_data_hours)
 
-summary(model_interact_freq)
-
-c(Previous = summary(simple_model_freq)$r.squared, New = summary(model_interact_freq)$r.squared)
-
-## Residuals comparison
-ggplot(data.table(Residuals = c(simple_model_freq$residuals, model_interact_freq$residuals),
-                  Type = c(rep("MLR - simple", nrow(siwim_data_hours)),
-                           rep("MLR with interactions", nrow(siwim_data_hours)))), 
-       aes(Type, Residuals, fill = Type)) +
-  geom_boxplot()
 
 ## Graph comparison of predictred vs real values
 datas <- rbindlist(list(siwim_data_hours[, .(Count, time_step)],
@@ -762,25 +667,16 @@ datas[, type := rep(c("Real", "Fitted"), each = nrow(siwim_data_hours))]
 ggplot(data = datas, aes(time_step, Count, group = type, colour = type)) +
   geom_line(size = 0.8) +
   theme_bw() +
-  labs(x = "Time", y = "Frequency",
-       title = "Fit from MLR with interactions")
+  labs(x = "Temps", y = "Fr√©quence",
+       title = "R√©el vs pr√©dictions avec interactions")
 
-## Visu of residuals
-ggplot(data = data.table(Fitted_values = model_interact_freq$fitted.values,
-                         Residuals = model_interact_freq$residuals),
-       aes(Fitted_values, Residuals)) +
-  geom_point(size = 1.7) +
-  # geom_smooth() +
-  geom_hline(yintercept = 0, color = "red", size = 1) +
-  labs(title = "Fitted values vs Residuals")
-
-ggQQ(model_interact_freq)
+c(Previous = summary(simple_model_freq)$r.squared, New = summary(model_interact_freq)$r.squared)
 
 ```
 
-# SÈlection de variables de lags par stepwise
+## 4.3 S√©lection de variables de lags par stepwise pour les regressions
 
-```{r "code stepwise", eval=FALSE, echo=FALSE}
+```{r "code stepwise", eval=FALSE, include=FALSE}
 ## lags
 
 nb_lags <- 168
@@ -793,26 +689,36 @@ siwim_data_hours_X <- siwim_data_hours[, c("Count", "Heure", "Jour_semaine")]
 
 siwim_data_hours_X[ , (lags) := shift(siwim_data_hours$Count, 1:nb_lags)]
 
+lmfit <- lm(Count ~., data = siwim_data_hours_X)
+
 model_step <- step(lmfit, direction = "both", k = log(nrow(siwim_data_hours_X)))
 ```
 
-RÈsultats de la sÈlection :
+R√©sultats de la s√©lection :
 
 ```{r "resultats stepwise", echo=FALSE}
-model_step <- readRDS("4_Scripts/4_Time series models/lm_SIWIM_stepwise_model.rds")
+model_step <- readRDS("4_Scripts/4_Time series models/Models/lm_SIWIM_stepwise_model.rds")
 
 model_step$coefficients
 
 ```
 
-# Valdation croisÈe pour les sÈries temporelles
+## 4.4 Valdation crois√©e pour les s√©ries temporelles
 
-Les sÈries temporelles sont des observations ordonnÈes chronologiquement. Ainsi, contrairment aux donnÈes non temporelles, leur ordre a une importance dont il faut tenir compte lors de la validation croisÈe. Pour cela 2 approches existent :
+Les s√©ries temporelles sont des observations ordonn√©es chronologiquement. Ainsi, contrairment aux donn√©es non temporelles, leur ordre a une importance dont il faut tenir compte lors de la validation crois√©e. Pour cela 2 approches existent :
 
-* estimation du modËle sur un sous-Èchantillon dont la taille augmente de faÁon incrÈmentale, en tenant compte de l'odre temporel des donnÈes. La prÈvision est rÈalisÈe sur les valeurs postÈrieures ‡ cet Èchantillon pour un horizon de prÈvision donnÈ.
+* estimation du mod√®le sur un sous-√©chantillon dont la taille augmente de fa√ßon incr√©mentale, en tenant compte de l'odre temporel des donn√©es. La pr√©vision est r√©alis√©e sur les valeurs post√©rieures √† cet √©chantillon pour un horizon de pr√©vision donn√©.
 
-* estimation du modËle sur un groupe dÈfini par une fenÍtre glissante de taille fixe. La prÈvision est rÈalisÈe sur les valeurs postÈrieures ‡ cet Èchantillon pour un horizon de prÈvision donnÈ.
+* estimation du mod√®le sur un groupe d√©fini par une fen√™tre glissante de taille fixe. La pr√©vision est r√©alis√©e sur les valeurs post√©rieures √† cet √©chantillon pour un horizon de pr√©vision donn√©.
 
-[Validation croisÈe sur sÈrie temporelle](/img/cross_val_ts.png)
+![Validation crois√©e sur s√©rie temporelle](/img/cross_val_ts.png)
 
+## 4.5 Mod√®les entrain√©s avec validation crois√©e
+
++ Regression lin√©aire simple
++ Regression lin√©aire simple avec interactions
++ Regression lin√©aire simple avec lags 
++ R√©gression p√©nalis√©e (ridge/lasso)
++ Random forest
++ Gradient boosting
 

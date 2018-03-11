@@ -1,6 +1,6 @@
 
 #Loading data SIWIM
-setwd("D:/Dropbox/Data science/Formation CEPE/Projet/GitHub/SiWIM-project")
+#setwd("D:/Dropbox/Data science/Formation CEPE/Projet/GitHub/SiWIM-project")
 siwim_test_data_hours <- fread("2_Data/2_Retraitees/SiWIM_test_data_hours_original.csv")
 siwim_test_data_hours_full <- fread("2_Data/2_Retraitees/SiWIM_test_data_hours_full.csv")
 

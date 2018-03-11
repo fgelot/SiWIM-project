@@ -106,7 +106,13 @@ table(siwim_data_hours$Jour_sem_num)
 #                                 "dimanche"), ordered = TRUE)]
 
 
-siwim_data_hours[, Jour_semaine := factor(weekdays(Date))]
+siwim_data_hours[, Jour_semaine := factor(weekdays(Date), levels= c("lundi", 
+                                                                    "mardi", 
+                                                                    "mercredi", 
+                                                                    "jeudi", 
+                                                                    "vendredi", 
+                                                                    "samedi",
+                                                                    "dimanche"))]
 
 
 siwim_data_hours$Jour_semaine <- relevel(siwim_data_hours$Jour_semaine, ref = "lundi")
@@ -242,7 +248,7 @@ summary(siwim_data_hours$Count)
 
 boxplot(Count ~ Jour_semaine, data = siwim_data_hours)
 boxplot(Count ~ Heure, data = siwim_data_hours)
-boxplot(Count ~ Jour_semaine + Heure, data = siwim_data_hours)
+boxplot(Count ~ interaction(Heure,Jour_semaine), data = siwim_data_hours)
 
 siwim_data_hours[, Jour_semaine_heure := factor(paste(Jour_semaine,Heure), ordered = T)]
 #siwim_data_hours$Jour_semaine_heure <- factor(siwim_data_hours$Jour_semaine_heure, levels(siwim_data_hours$Jour_semaine_heure)[siwim_data_hours$Jour_semaine_heure])
@@ -254,6 +260,13 @@ levels(siwim_data_hours$Jour_semaine_heure)
 str(siwim_data_hours)
 str(siwim_data_dt_full)
 levels(siwim_data_hours$Jour_semaine)
+
+
+# Finding outliers
+
+siwim_data[which((abs(siwim_data$MGV - median(siwim_data$MGV)) / mad(siwim_data$MGV)) > 2)]
+
+siwim_data[siwim_data$MGV %in% boxplot.stats(siwim_data$MGV)$out]
 
 ## Write final data sets for time series,
 ## one witout missing values and one with inputted values
