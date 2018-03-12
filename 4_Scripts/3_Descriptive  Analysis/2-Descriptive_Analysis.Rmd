@@ -19,7 +19,7 @@ Nous compléterons avec quelques indicateurs quantitatifs et graphiques.
 Enfin, nous utiliserons des techniques d'analyses multidimensionnelles : les analyses factorielles et le clustering non supervisé afin de poursuivre l'exploration de notre jeu de données.
 
 
-```{r}
+```{r, message=FALSE,warning=FALSE}
 # chargement des librairies 
 
 library(data.table)
@@ -131,7 +131,7 @@ Nous allons à présent étudier la force de la liaison entre les variables qual
 Le V de Cramer présente l'avantage d'offrir une mesure absolue de l'intensité de la liaison entre deux variables qualitatives.
 La liaison est nulle quand V =0, liaison est maximales lorsque V = 1.
 
-```{r}
+```{r, message=FALSE,warning=FALSE}
 # liaisons entre variables qualitatives (calcul du V de Cramer)
 cramer <- matrix(NA, ncol(varquali2), ncol(varquali2))
 for (i in (1:ncol(varquali2))){
@@ -164,7 +164,7 @@ varquanti2 <- varquanti[,c("N", "total_axle_dist","T","Reduced_chi_squared","Tim
 
 Nous calculons le coefficient de corrélation linéaire de Pearson entre les variables quantitatives :
 
-```{r}
+```{r, message=FALSE,warning=FALSE}
 # Matrice de correlation (Pearson) 
 corr <- cor(varquanti2)
 corrplot(corr, method="number")
@@ -438,7 +438,7 @@ don_PCA_clusters <- data.frame(res_PCA2$ind$coord)
 Chaque méthode testée produira ses clusters, qui seront stockés dans le data frame contenant les coordonnées des axes factoriels, afin de faciliter les comparaisons et représentations ultérieures. 
 
 
-## Méthode hiérarchique : 
+## Méthode hiérarchique
 
 Les méthodes hiérarchiques présentent l'intérêt de proposer un nombre optimal de cluster, dont le découpage est réalisé en optimisant un critère. 
 
@@ -451,7 +451,7 @@ Afin de contourner cette difficulté, nous allons réaliser en amont un partitio
 On met ensuite en oeuvre une classification ascendante hiérarchique (CAH) sur ces groupes d'individus issus de l'étape précédente et on obtient une hiérarchie qui est approximativement la haut de la hiérarchie que l'on obtiendrait en classifiant les individus directement.
 
 
-```{r}
+```{r, message=FALSE,warning=FALSE}
 # Kmeans sur un nombre grand nombre de clusters
 set.seed(123)
 res_kmeans_grand <- kmeans(don_PCA_clusters[,c("Dim.1","Dim.2","Dim.3","Dim.4")],centers=1000,iter=100)
@@ -523,19 +523,6 @@ ggplot(don_PCA_clusters, aes(x=Dim.1, y=Dim.2, color=clusters_kmeans)) + geom_po
     labs(title ="Représentation des camions sur le premier plan factoriel")
 ```
 
-
-### Estimation du nombre de clusters
-
-```{r}
-# fviz_cluster(res_kmeans, data = res_PCA2$ind$coord,
-#              palette = c("#2E9FDF", "#00AFBB", "#E7B800", "#FC4E07"), 
-#              ellipse.type = "euclid", # Concentration ellipse
-#              star.plot = TRUE, # Add segments from centroids to items
-#              repel = TRUE, # Avoid label overplotting (slow)
-#              ggtheme = theme_minimal()
-#              )
-```
-
  
 ## Partitionnement k - medoides : CLARA sur composantes principales
 
@@ -603,22 +590,14 @@ Nous essaierons néanmoins d'interpréter les clusters (voir ci après)
 
 ## Partitionnement basé sur densité : OPTICS sur composantes principales
 
-Cet algorithme est similaire à DBSCAN et élimine son principal défaut : l'impossibilité de détecter des partitions de densités différentes
-
-
-```{r}
-# OPTICS
-set.seed(123)
-res_optics <- optics(don_PCA_clusters[,c("Dim.1","Dim.2","Dim.3","Dim.4")], eps = 10, minPts = 10)
-
-```
+Cet algorithme est similaire à DBSCAN et élimine son principal défaut : l'impossibilité de détecter des partitions de densités différentes.
 
 
 ##  Méthodes neuronales : cartes auto-adaptatives de Kohonen (SOM)
 
-```{r}
-# A faire
-```
+Les cartes de Kohonen forment une classe de neurones artificiels, formant une méthode d'apprentissage non supervisé.
+L'algorithme est très léger en temps de calcul, permet de détecter des relations non linéaires mais présente l'inconvénient que les relations entre neurones ne peuvent être cassées pour une meilleure représentation des données.
+L'algorithme "Growing Neural Gas" corrige ce problème.
 
 ##  Interprétation des classes
 
@@ -630,23 +609,41 @@ construite via chacune des méthodes :
 
 ```{r}
 # Rajout des classes dans le jeu de variables quanti (pour l'interprétation) et d'analyse final
-
-varquanti_clusters <- cbind.data.frame(varquanti2,clusters_kmeans = don_PCA_clusters[,c("clusters_kmeans")])
+varquanti_clusters <- cbind.data.frame(varquanti2,don_PCA_clusters[,c("clusters_cah_mixte","clusters_kmeans","clusters_clara","clusters_dbscan")])
 siwim_final2 <- cbind.data.frame(siwim_final,don_PCA_clusters[,c("clusters_cah_mixte","clusters_kmeans","clusters_clara")])
 
 ```
 
-Nous utilisons la fonction `catdes` du package `FactoMiner` nous aidant à interpréter les classes :
+L'interprétation des classes est réalisée en comparant la moyenne de chaque variable quantitatives de chaque classe, à la moyenne de la population globale de cette même variable :
 
 ```{r}
 # Interpretation des classes
-catdes(varquanti_clusters[1:7],num.var = 8)
+print("moyenne sur l'ensemble des camions")
+colMeans(varquanti_clusters[,.(N,total_axle_dist,T,Reduced_chi_squared,Time_num,Vitesse,MGV)])
+
+by(varquanti_clusters[,.(N,total_axle_dist,T,Reduced_chi_squared,Time_num,Vitesse,MGV)],
+   varquanti_clusters$clusters_kmeans, colMeans)
+
+by(varquanti_clusters[,.(N,total_axle_dist,T,Reduced_chi_squared,Time_num,Vitesse,MGV)],
+   varquanti_clusters$clusters_cah_mixte, colMeans)
+
+by(varquanti_clusters[,.(N,total_axle_dist,T,Reduced_chi_squared,Time_num,Vitesse,MGV)],
+   varquanti_clusters$clusters_clara, colMeans)
+
 ```
 
 De manière générale, nous accordons de l'importance à l'interprétabilité des classes. Nous privilégerons ainsi une partition la facilitant.
 
+Nous choisissons de conserver la partition en trois groupes, réalisés via Kmeans sur les 4 premiers axes de l'analyse en composantes principales.
 
-## Rajout d'une variable de classe au jeu de donnée principal
+**Le groupe 1** correspond au camion ayant une longueur, un nombre d'essieux, une masse nettement inférieure à la moyenne, dont la vitesse est en moyenne supérieure. **Ce groupe comprend notamment les véhicules utilitaires légers (VUL)** notamment caractérisés par leurs deux axes
+
+**Le groupe 2** correspond à des véhicules comportant un nombre d'essieux, une longueur,  et une masse supérieures à la moyenne. La Masse est nettement plus importante, ce groupe caractérise les véhicules les plus lourds et les plus lents comme en attestent leur masse et leur vitesse moyenne.
+
+**Le groupe 3** est un groupe intermédiaire : il comporte des camions plus lourds que la moyenne mais en moyenne deux fois moins lourds que ceux du groupe 2. Leur vitesse est la plus importante, supérieure à la moyenne et aux petits véhicules. Ce sont des camions assez grands et commportant un nombre d'essieux supérieur à la moyenne.
+
+
+## Rajout d'une variable de classe au jeu de donnée principal + export
 
 ```{r}
 # Rajout variable
@@ -660,9 +657,3 @@ On écrit ensuite le fichier modifié (comportant la colonne de clusters en plus
 write.csv(siwim_data_after_input_clusters, file = "2_Data/2_Retraitees/SiWIM_data_after_input_clusters.csv")
 ```
 
-
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
-
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
-
-The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.

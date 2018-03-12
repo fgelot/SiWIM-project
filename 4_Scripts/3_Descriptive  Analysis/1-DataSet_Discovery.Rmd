@@ -14,7 +14,7 @@ knitr::opts_knit$set(root.dir = normalizePath("Z:/Data Science/R/SiWIM-project")
 
 Nous allons dans cette section partir des données brutes afin de les retravailler en recodant certaines variables
 
-```{r}
+```{r, message=FALSE,warning=FALSE}
 # chargement des librairies 
 
 library(data.table)
