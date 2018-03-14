@@ -59,54 +59,123 @@ ggplot(don,aes(x=MGV,y=Reduced_chi_squared, colour=outlier))+
   geom_boxplot()+
   geom_text(aes(label=Warning_flags),hjust=-0.3)
 
-#plot
 ggplot(don,aes(x=outlier,y=Reduced_chi_squared, colour=Warning_flags))+
    geom_boxplot()
 
 ggplot(don, aes(y=Warning_flags, x=Reduced_chi_squared, group=outlier)) +
   geom_point(aes(shape=outlier, color=outlier))
 
-# mtext(paste("Outliers: ", paste(outlier_values, collapse=", ")), cex=0.6)
-# pour ecrire les valeurs des outliers, mais ici il y en a 314: trop
-
-# Par exemple, pour que les moutaches soit égales à 10 fois la longueur de la boite
-
-outlier_values_ext <- boxplot.stats(donPoidsDim$WGV, coef=10)$out
-boxplot(donPoidsDim$WGV, main="Poids total", boxwex=0.1)
-mtext(paste("Outliers: ", paste(outlier_values_ext, collapse=", ")), cex=0.6)
-
 # Idem pour le poids sur essieu 2
 
-outlier_values2 <- boxplot.stats(donPoidsDim$W2)$out
-boxplot(donPoidsDim$W2, main="Poids 2", boxwex=0.1)
+don$outlier <- check_outlier(don$M2)
+ggplot(don, aes(y=Warning_flags, x=Reduced_chi_squared, group=outlier)) +
+  geom_point(aes(shape=outlier, color=outlier))
 
-# Idem pour le poids sur essieu 1
+# Idem pour le poids sur vitesse
 
-outlier_values1 <- boxplot.stats(donPoidsDim$W1)$out
-boxplot(donPoidsDim$W1, main="Poids 1", boxwex=0.1) # 38000 véhicules
-
-boundaries <- seq(-1, max(donPoidsDim$W1)+1, by=10)
-hist(donPoidsDim$W1, breaks=boundaries) # Problème des valeurs aberrantes
-
-# Approche bivariee: poids total ~longueur totale
-
-boxplot(WGV ~ 0+A1+A2+A3+A4+A5+A6+A7+A8+A9+A10+A11+A12+A13+A14+A15, 
-        data=donPoidsDim, main="Poids total en fonction de la longueur totale")
+don$outlier <- check_outlier(don$Vitesse)
+ggplot(don, aes(y=Warning_flags, x=Reduced_chi_squared, group=outlier)) +
+  geom_point(aes(shape=outlier, color=outlier))
 
 
-boxplot(WGV ~ 0+A1+A2+A3+A4+A5+A6+A7+A8+A9+A10+A11+A12+A13+A14+A15, 
-        data=donPoidsDim[1:10,], main="Poids total en fonction de la longueur totale")
+# Approche multivariee:
 
-boxplot(WGV ~ cut(A1+A2+A3+A4+A5+A6+A7+A8+A9+A10+A11+A12+A13+A14+A15, 
-                  pretty(donPoidsDim$A2)), data=donPoidsDim[1:1000], 
-        main="Poids total en fonction de la longueur totale", cex.axis=0.5)
+# recherche d'un modèle 
+# puis: les observations avec une distance de Cook > 4 sont considérés come influents
+# outliers: éléments avec distance de Cook > 4 fois la distance moyenne
 
-# Approce multivariÃ©e
-# Avec la distance de Cook
-# Outliers : distance > Ã  4 fois la distance moyenne
+# Recherche du "meilleur" modèle
 
-mod <- lm(WGV ~ ., data=donPoidsDim)
-cooksd <- cooks.distance(mod)
+train <- don[,c("A1","A2","A3","A4","A5","A6","A7",
+                 "M1","M2","M3","M4","M5","M6","M7","M8","N", 
+                 "Vitesse", "MGV")]
+
+install.packages("caret",
+                 repos = "http://cran.r-project.org", 
+                 dependencies = c("Depends", "Imports", "Suggests"))
+library("caret")
+
+train <- don[,c("A1","A2","A3","A4","A5","A6","A7",
+                "M1","M2","M3","M4","M5","M6","M7","M8","N", 
+                "Vitesse", "MGV")]
+
+str(train)
+
+sum(is.na(train))
+
+
+#Imputing missing values using KNN.Also centering and scaling numerical columns
+preProcValues <- caret::preProcess(train, method = c("knnImpute","center","scale"))
+
+library('RANN')
+train_processed <- predict(preProcValues, train)
+sum(is.na(train_processed))
+
+str(train_processed)
+
+#Spliting training set into two parts based on outcome: 75% and 25%
+index <- createDataPartition(train_processed$WGV, p=0.75, list=FALSE)
+trainSet <- train_processed[ index,]
+testSet <- train_processed[-index,]
+
+#Checking the structure of trainSet
+str(trainSet)
+
+#Feature selection using rfe in caret
+control <- rfeControl(functions = rfFuncs,
+                      method = "repeatedcv",
+                      repeats = 3,
+                      verbose = FALSE)
+outcomeName<-'WGV'
+predictors<-names(trainSet)[!names(trainSet) %in% outcomeName]
+Loan_Pred_Profile <- rfe(trainSet[,predictors], trainSet[,outcomeName],
+                         rfeControl = control)
+Loan_Pred_Profile
+
+names(getModelInfo())
+
+fitControl <- trainControl(
+  method = "repeatedcv",
+  number = 5,
+  repeats = 5)
+
+model_glm<-train(trainSet[,predictors],trainSet[,outcomeName],method='gbm',trControl=fitControl,tuneLength=10)
+print(model_glm)
+plot(model_glm)
+
+model_rqlasso<-train(trainSet[,predictors],trainSet[,outcomeName],method='rqlasso',
+                     ,trControl=fitControl,tuneLength=10)
+print(model_rqlasso)
+plot(model_rqlasso)
+
+model_enet<-train(trainSet[,predictors],trainSet[,outcomeName],method='enet',
+                  ,trControl=fitControl,tuneLength=10)*print(model_glm)
+print(model_enet)
+plot(model_enet)
+
+model_ridge<-train(trainSet[,predictors],trainSet[,outcomeName],method='ridge',
+                   ,trControl=fitControl,tuneLength=10)
+print(model_ridge)
+plot(model_ridge)
+
+model_rf<-train(trainSet[,predictors],trainSet[,outcomeName],method='rf',
+                ,trControl=fitControl,tuneLength=10) # random Forest
+print(model_rf)
+plot(model_rf)
+
+model_gbm<-train(trainSet[,predictors],trainSet[,outcomeName],method='gbm',
+                 ,trControl=fitControl,tuneLength=10) #Stochastic Gradient Boosting
+print(model_gbm)
+plot(model_gbm)
+
+results <- resamples(list(mod.glm=model_glm, mod.rqlasso=model_rqlasso, mod.enet=model_enet,
+                          , mod.ridge=model_ridge, mod.rf=model_rf, mod.gbm=model_gbm))
+summary(results)
+bwplot(results, metric="Spec")
+bwplot(results, metric="ROC")
+dotplot(results)
+
+cooksd <- cooks.distance(mod.glm)
 
 plot(cooksd, pch="*", cex=2, 
      main="Observations influentes, avec la distance de Cook") 
