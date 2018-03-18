@@ -1,0 +1,378 @@
+---
+title: "Découverte du jeu de données du projet SIWIM"
+output: 
+  html_document:
+    theme: "united"
+    df_print: paged
+---
+
+```{r "setup", include=FALSE}
+# Configuration locale du chemin du projet SIWIM :
+knitr::opts_knit$set(root.dir = normalizePath("Z:/Data Science/R/SiWIM-project"))
+```
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+## chargement des librairies 
+
+library(data.table)
+library(stringr) # manipulation de chaine de caracteres
+library(missMDA) # imputation des données manquantes
+library(questionr) # calcul Vcramer et des fréquences
+library(ggplot2)
+library(cowplot) # grilles de graphiques
+library(reshape2)# plot des valeurs manquantes
+```
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# Chargement des données brutes, récupérées par scraping et reformatées
+siwim_data <- fread("2_Data/2_Retraitees/SiWIM_data_formated.csv")
+
+```
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+
+## recodage de variables qualitatives
+
+# Suppression de variables inutiles
+siwim_data[, c("Stage_trace", "Offset", "Impact_factor") := NULL]
+
+# Conversion en factor de la variable Site_ID
+siwim_data[, Site_ID := as.factor(Site_ID)]
+
+# Conversion en factor de la variable Warning_flags
+siwim_data[, Warning_flags := as.factor(Warning_flags)]
+
+# Recodification de la variable lane (0 = droite, 1 = gauche)
+siwim_data[, Lane := factor(siwim_data$Lane, labels = c("droite", "gauche"))]
+
+# Conversion en factor de la variable Subclass_ID
+siwim_data[, Subclass_ID := factor(siwim_data$Subclass_ID)]
+
+# Conversion en factor de la variable Axle_groups
+siwim_data[, Axle_groups := factor(siwim_data$Axle_groups)]
+
+# Renommage et conversion en factor de la variable N (nombre d'axes)
+siwim_data[, Nb_axles := factor(siwim_data$N)]
+```
+
+```{r,message=FALSE, warning=FALSE, echo = FALSE}
+
+## Creation de nouvelles variables
+
+# Creation de variables depuis timestamp au format POSIXct :
+siwim_data[, Date    := as.POSIXct(substr(siwim_data$Timestamp,1,10), format = '%Y-%m-%d')]
+siwim_data[, Horaire := substr(siwim_data$Timestamp,12,19)]
+siwim_data[, Timestamp := as.POSIXct(substr(siwim_data$Timestamp,1,19), format = '%Y-%m-%d %H:%M:%S')]
+
+# Création d'une variable temporelle quantitative depuis le 1er Janvier 2017
+
+siwim_data[, Time_num := as.numeric((siwim_data$Timestamp - as.POSIXct("2017-01-01 00:00:00", format = '%Y-%m-%d %H:%M:%S'))/360)]
+
+# Creation de variables temporelles de type factor
+siwim_data[, Annee := as.factor(strftime(siwim_data$Date, format = "%Y"))]
+siwim_data[, Mois_num := as.factor(strftime(siwim_data$Date, format = "%m"))]
+siwim_data[, Mois_annee := as.factor(strftime(siwim_data$Date, format = "%B"))]
+siwim_data[, Jour_num := as.factor(strftime(siwim_data$Date, format = "%d"))]
+siwim_data[, Jour_semaine := as.factor(strftime(siwim_data$Date, format = "%A"))]
+siwim_data[, Heure := as.factor(str_sub(Horaire, 1, 2))]
+```
+
+```{r, message=FALSE, echo = FALSE}
+# Creation de la variable qualitative Anomalie
+siwim_data[,Anomalie := "N"][Warning_flags != "00000000",Anomalie := "Y"]
+
+# Transformation en factor
+siwim_data[, Anomalie := factor(siwim_data$Anomalie)]
+```
+
+```{r,message=FALSE, warning=FALSE, echo = FALSE}
+
+## Transformation de variable ayant des unités anglo-saxonnes en unités européennes
+
+# Passage de la vitesse en km/h
+siwim_data[, Vitesse := siwim_data$v * (36/10)]
+
+# Passage du poids en tonnes
+siwim_data[, MGV := siwim_data$WGV / 9.81]
+
+# Passage du poids de chaque essieu en tonnes
+maxN <- 16
+axles_load <- paste("W", 1:maxN, sep = "")
+axles_mass <- paste("M", 1:maxN, sep = "")
+siwim_data[, (axles_mass) := lapply(axles_load, function(x){get(x)/9.81})]
+```
+
+```{r,message=FALSE, warning=FALSE, echo = FALSE}
+
+## Suppression de variables inutiles
+
+# Suppression de la variable index V1 avant écriture des données dans le .csv
+siwim_data[, V1 := NULL]
+
+# Suppression des variables d'origine codées dans des unités anglo-saxonnes
+siwim_data [, c("v","WGV", "W1","W2","W3","W4","W5","W6","W7","W8","W9","W10",
+         "W11","W12","W13","W14","W15","W16") := NULL]
+```
+
+# Description des données
+
+Le jeu de données contient 54 variables et environ 184 000 lignes :
+
+Chaque ligne représente les valeurs des variables pour un camion capturé par le système de pesage par poids du Pont de Normandie.
+
+Il est important de rappeler que le système comporte sa propre fiabilité et est possiblement amené à capturer du bruit ou à dysfonctionner.
+
+Nous notons ici la présence de nombreuses valeur manquantes ou de valeur aberrantes lorsque nous analysons par exemple les minimum ou les maximum de certaines variables.
+
+
+```{r,echo = FALSE}
+
+# Creation de deux data frame séparant variables quantitatives et variables qualitatives
+varquanti <- siwim_data[, lapply(siwim_data, is.numeric) == TRUE, with = FALSE]
+varquali <- siwim_data[,lapply(siwim_data,is.numeric) == FALSE, with = FALSE]
+```
+
+
+# Quelques graphiques
+
+```{r}
+# creation de jeux de données pour affichages graphiques
+
+# Jeu de données des variables quantitatives
+var_quali_graph <- varquali[,c("Lane", "Nb_axles", "Annee","Mois_annee","Jour_semaine","Heure","Anomalie")]
+
+# Jeu de données des variables qualitatives
+var_quanti_graph <- varquanti[,c("N","total_axle_dist","T","Reduced_chi_squared","Time_num","Vitesse","MGV")]
+
+# Jeu de données globales, simplifiées, avant traitement des valeurs manquantes
+var_graph <- cbind.data.frame(var_quali_graph,var_quanti_graph)
+```
+
+## Contexte de passage du camion (variables qualitatives)
+
+Disposer ici quelques graphiques illustrant les données et montrant les valeurs manquantes
+
+```{r}
+
+# geom_bar
+# Mois de passage
+p7 <- ggplot(var_quali_graph,aes(x = Mois_annee)) +  
+  geom_bar(color="black",fill= "pink") + 
+  labs(title = "Mois de passage", x ="Mois", y ="Nb") + 
+  background_grid(major = "xy", minor = "none")
+
+# pie plot
+
+
+```
+
+
+## Descripteurs des camions (variables quantitatives)
+
+```{r}
+# Histogramme
+
+# Nombre d'essieux
+p1 <- ggplot(var_quanti_graph,aes(x = N)) +  
+  geom_histogram(color="black",fill= "lightblue",binwidth=1) + 
+  labs(title = "Essieux", x ="Nombre d'essieux", y ="Nb") + 
+  geom_vline(aes(xintercept=mean(N)),color="blue", linetype="dashed", size=1)+ 
+  background_grid(major = "xy", minor = "none")
+
+# Vitesse
+p2 <- ggplot(var_quanti_graph,aes(x = Vitesse)) +  
+  geom_histogram(color="black",fill= "lightblue",binwidth=1) +
+  labs(title = "Vitesse", x ="Vitesse (km/h)", y ="Nb") +
+  geom_vline(aes(xintercept=mean(Vitesse)),color="blue", linetype="dashed", size=1) + 
+  background_grid(major = "xy", minor = "none") 
+
+# Masse du camion
+p3 <- ggplot(var_quanti_graph,aes(x = MGV)) +  
+  geom_histogram(color="black",fill= "lightblue",binwidth=1) + 
+  labs(title = "Masse du camion", x ="Masse (tonnes)", y ="Nb") + 
+  geom_vline(aes(xintercept=mean(MGV)),color="blue", linetype="dashed", size=1) + 
+  background_grid(major = "xy", minor = "none") 
+
+# Distance maximale entre les essieux
+p4 <- ggplot(var_quanti_graph,aes(x = total_axle_dist)) +  
+  geom_histogram(color="black",fill= "lightblue",binwidth=1) + 
+  labs(title = "Distance entre essieux", x ="Distance (m)", y ="Nb") + 
+  geom_vline(aes(xintercept=mean(total_axle_dist)),color="blue", linetype="dashed", size=1) + 
+  background_grid(major = "xy", minor = "none") 
+
+# Temperature du systeme de pesage
+p5 <- ggplot(var_quanti_graph,aes(x = T)) +  
+  geom_histogram(color="black",fill= "lightblue",binwidth=1) + 
+  labs(title = "Température du systeme", x ="Temperature (°C)", y ="Nb") + 
+  geom_vline(aes(xintercept=mean(T)),color="blue", linetype="dashed", size=1) + 
+  background_grid(major = "xy", minor = "none")
+
+# Chi2 reduit
+p6 <- ggplot(var_quanti_graph,aes(x = Reduced_chi_squared)) +  
+  geom_histogram(color="black",fill= "lightblue",binwidth=1) + 
+  labs(title = "Chi2 reduit", x ="Chi2", y ="Nb") + 
+  geom_vline(aes(xintercept=mean(Reduced_chi_squared)),color="blue", linetype="dashed", size=1) + 
+  background_grid(major = "xy", minor = "none")
+
+
+
+```
+
+```{r, message=FALSE, warning=FALSE}
+plot_grid(p1,p2,p3,p4,p5,p6, ncol = 2, nrow = 3)
+```
+
+Plusieurs valeurs aberrantes physiquement, des camions :
+
+- Avec 16 essieux
+- Roulant à 180 km/h
+- Pesant 140 tonnes
+- Mesurant 80 mètres
+
+Et une série de températures du sytème observée à -273 °C
+
+
+# Traitement des valeurs manquantes et aberrantes
+
+On observe donc :
+
+**Idée générale** : attribuer aux données aberrantes (dont nous sommes surs qu'elles soient fausses) un valeur "NA" puis reconstituer leur valeur grasse aux techniques d'imputation du package `"missMDA"`.
+
+Les seuils sont fixés à partir de la connaissance métier.
+
+```{r, echo = FALSE}
+# On considere qu'une valeur supérieure à 8 essieux est aberrante
+siwim_data[siwim_data$N > 8, N := NA]
+siwim_data[is.na(siwim_data$N), Nb_axles := NA]
+
+# On considere comme valeur anormale une distance totale entre les axes > à 20 m
+siwim_data[total_axle_dist > 20, total_axle_dist := NA]
+
+# On considere comme valeur anormale les températures négatives < à -10°C
+siwim_data[T < -20, T := NA]
+
+# On considere comme valeur anormale la vitesse d'un camion > à 130 km/h
+siwim_data[Vitesse > 130, Vitesse := NA]
+
+# On considere comme valeur anormale la masse d'un camion > à 70 T ou égale à 0
+siwim_data[MGV > 70 | MGV == 0, MGV := NA]
+
+#On supprime des variables liées à un trop grand nombre d'axes
+siwim_data [, c("A8", "A9","A10","A11","A12","A13","A14","A15","M9","M10",
+                "M11","M12","M13","M14","M15","M16") := NULL]
+```
+
+
+
+```{r}
+# graphiques des valeurs manquantes
+
+# Fonction d'affichage
+ggplot_missing <- function(x){
+  
+  x %>% 
+    is.na %>%
+    melt %>%
+    ggplot(data = .,
+           aes(x = X2,
+               y = X1)) +
+    geom_raster(aes(fill = value)) +
+    scale_fill_grey(name = "",
+                    labels = c("Present","Missing")) +
+    theme_minimal() + 
+    theme(axis.text.x  = element_text(angle=45, vjust=0.5)) + 
+    labs(x = "Variables in Dataset",
+         y = "Rows / observations")
+}
+
+```
+
+```{r}
+# Graphique des valeurs manquantes
+ggplot_missing(siwim_data[,c("Lane", "Nb_axles","Annee","Mois_annee","Jour_semaine","Heure","Anomalie",
+                             "N","total_axle_dist","T","Reduced_chi_squared","Time_num","Vitesse","MGV")])
+
+```
+
+Ce graphique affiche les valeurs "NA"
+
+
+
+```{r}
+# bar plot de la proportion de valeurs manquantes par variables
+
+```
+
+
+
+```{r, echo = FALSE}
+# Jeu de donnée contenant seulement les variables utiles pour l'imputation
+siwim_data_imput <- siwim_data[, c( "Lane", "N", "Nb_axles", "Anomalie", "total_axle_dist", "T", 
+   "Reduced_chi_squared", "Time_num", "Vitesse", "MGV")]
+```
+
+L'imputation est réalisée par analyse factorielle des données multiples (FAMD) du package `Factominer`.
+Nous retenons l'information apportée par 7 axes factoriels :
+
+```{r, echo = FALSE}
+siwim_data_inputted <- imputeFAMD(siwim_data_imput, ncp = 7, method = "Regularized")
+```
+
+
+```{r, echo = FALSE}
+# Transformation en data frame :
+siwim_data_inputted <- as.data.frame(siwim_data_inputted$completeObs)
+```
+
+On concatène les variables imputées avec les colonnes initiales
+```{r, echo = FALSE}
+siwim_data_inputted_final <- cbind(siwim_data[, -c( "Lane","N", "Nb_axles", "Anomalie", "total_axle_dist", "T", "Reduced_chi_squared", "Time_num", "Vitesse", "MGV")],siwim_data_inputted)
+```
+
+Voici le résumé du jeu de données final après imputation, en comparaison de celui obtenu initialement :
+
+```{r, echo = FALSE}
+summary(siwim_data[,.( Lane,N, Nb_axles, Anomalie, total_axle_dist, T, Reduced_chi_squared, Time_num, Vitesse, MGV)])
+summary(siwim_data_inputted_final[,.( Lane,N, Nb_axles, Anomalie, total_axle_dist, T, Reduced_chi_squared, Time_num, Vitesse, MGV)])
+```
+
+L'imputation semble donner de bons résultats. Etant basée sur une méthode d'estimation, les valeurs imputées peuvent de nouveaux franchir les limites fixées.
+Nous pouvons soit les supprimer, soit imputer aux valeurs limites de manière à conserver la donnée et donc le plus d'information possible.
+
+```{r, echo = FALSE}
+# Fixation aux valeurs limites pour les imputations qui auraient franchies les limites théoriques
+siwim_data_inputted_final[N > 8, N := 8]
+siwim_data_inputted_final[total_axle_dist > 20, total_axle_dist := 20]
+siwim_data_inputted_final[T < -20, T := -10]
+siwim_data_inputted_final[Vitesse > 130, Vitesse := 130]
+siwim_data_inputted_final[MGV < 0, MGV := 0.5]
+siwim_data_inputted_final[MGV > 70, MGV := 70]
+```
+
+
+
+
+
+
+
+
+La deuxième approche consiste à éliminer les individus ayant des valeurs manquantes et / ou aberrantes.
+
+```{r, echo = FALSE}
+## Suppression des individus comportant des donnees manquantes
+siwim_data_missing_del <- siwim_data[!is.na(siwim_data$N)
+                                            & !is.na(siwim_data$total_axle_dist) 
+                                            & !is.na(siwim_data$T)
+                                            & !is.na(siwim_data$Vitesse)
+                                            & !is.na(siwim_data$MGV)]
+```
+
+Résumé des données sans ces valeurs aberrantes :
+
+```{r, echo = FALSE}
+summary(siwim_data_missing_del[,.( Lane,N, Nb_axles, Anomalie, total_axle_dist, T, Reduced_chi_squared, Time_num, Vitesse, MGV)])
+```
+
+Nous constatons que les deux méthodes semblent aboutir à des résultats similaires : les résumés montrent que les valeur prises par les indicateurs de dispersion et de position restent semblables.
+
+
