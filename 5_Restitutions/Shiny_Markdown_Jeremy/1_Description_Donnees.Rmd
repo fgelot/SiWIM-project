@@ -125,7 +125,7 @@ Il est important de rappeler que le système comporte sa propre fiabilité et es
 Nous notons ici la présence de nombreuses valeur manquantes ou de valeur aberrantes lorsque nous analysons par exemple les minimum ou les maximum de certaines variables.
 
 
-```{r,echo = FALSE}
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
 
 # Creation de deux data frame séparant variables quantitatives et variables qualitatives
 varquanti <- siwim_data[, lapply(siwim_data, is.numeric) == TRUE, with = FALSE]
