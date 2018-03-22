@@ -14,6 +14,38 @@ knitr::opts_knit$set(root.dir = normalizePath("D:/Dropbox/Data science/Formation
 #options(width = 1000)
 ```
 
+```{r "funggcast", include=FALSE}
+
+#--Produces a data.frame with the Source Data+Training Data, Fitted Values+Forecast Values, forecast data Confidence Intervals
+funggcast<-function(dn,fcast){ 
+ 
+	en<-length(fcast$fitted) #extract the max date used in the forecast
+ 
+	#Extract Source and Training Data
+	ds<-as.data.frame(dn)
+	names(ds)<-'observed'
+	ds$date<-index(dn)
+ 
+	#Extract the Fitted Values (need to figure out how to grab confidence intervals)
+	dfit<-as.data.frame(fcast$fitted)
+	dfit$date<-index(dn)[1:en]
+	names(dfit)[1]<-'fitted'
+ 
+	ds<-merge(ds,dfit,all.x=T) #Merge fitted values with source and training data
+ 
+	#Exract the Forecast values and confidence intervals
+	dfcastn<-as.data.frame(fcast)
+	dfcastn$date<-index(dn)[(en+1):length(dn)]
+	names(dfcastn)<-c('forecast','lo80','hi80','lo95','hi95','date')
+ 
+	pd<-merge(ds,dfcastn,all.x=T) #final data.frame for use in ggplot
+	return(pd)
+ 
+}
+
+
+```
+
 <style>
     body .main-container {
         max-width: 1000px;
@@ -350,53 +382,41 @@ On peut constater que le graphique ACF nous indique un ordre MA de 8 et le graph
 
 ## 3.3 ARIMA : Auto-regressive integrated moving average
 
-Number of AR (Auto-Regressive) terms (p): AR terms are just lags of dependent variable.
-For instance if p is 5, the predictors for x(t) will be x(t-1)..x(t-5).
-Number of MA (Moving Average) terms (q): MA terms are lagged forecast errors in prediction equation.
-For instance if q is 5, the predictors for x(t) will be e(t-1)..e(t-5)
-where e(i) is the difference between the moving average at ith instant and actual value.
-Number of Differences (d): These are the number of nonseasonal differences,
-i.e. in this case we took the first order difference.
-So either we can pass that variable and put d=0 or pass the original variable and put d=1.
-Both will generate same results.
+Un modèle ARIMA cherche à prédire la valeur d'une série temporelle en fonction de ses valeurs précédentes ($y_t = f(y_{t-1}, y_{t-2}, …)$).
 
+Les processus autorégressifs supposent que chaque point peut être prédit par la somme
+pondérée d'un ensemble de points précédents, plus un terme aléatoire d'erreur.
+
+Le processus d'intégration suppose que chaque point présente une différence constante avec le
+point précédent.
+
+Les processus de moyenne mobile supposent que chaque point est fonction des erreurs
+entachant les points précédant, plus sa propre erreur.
+Un modèle ARIMA est étiqueté comme modèle ARIMA (p,d,q), dans lequel :
++ p est le nombre de termes auto-régressifs
++ d est le nombre de différences
++ q est le nombre de moyennes mobiles.
+
+La différentiation d'une série est nécessaire pour éliminer toute tendance et atteindre la stationnarité. Dans notre cas, la série est dèjà stationnaire (test de Dickey-Fuller). L'ordre d de différenciation (I integrated en anglais) sera systématiquement à 0.
+
+Les modèles auto-régressifs supposent que yt est une fonction linéaire des valeurs
+précédentes.
+
+$y_t = \mu + \Phi_1 y_{t-1} + \Phi_2 y_{t-2} + \Phi_3 y_{t-3} + \epsilon_t$
+
+Les modèles à moyenne mobile suggèrent que la série présente des fluctuations autour d'une
+valeur moyenne. On considère alors que la meilleure estimation est représentée par la
+moyenne pondérée d'un certain nombre de valeurs antérieures (ce qui est le principe des
+procédures de moyennes mobiles utilisées pour le lissage des données). Ceci revient en fait à
+considérer que l’estimation est égal à la moyenne vraie, auquel on ajoute une somme
+pondérée des erreurs ayant entaché les valeurs précédentes :
+
+$y_t = \mu  - \theta_1 \epsilon_{t-1} - \theta_2 \epsilon_{t-2} - \theta_3 \epsilon_{t-3} + \epsilon_t$
 
 q - The lag value where the ACF chart crosses the upper confidence interval for the first time
 p - The lag value where the PACF chart crosses the upper confidence interval for the first time. 
 
 $p = 1$ and $q = 8$
-
-```{r "funggcast", include=FALSE}
-
-#--Produces a data.frame with the Source Data+Training Data, Fitted Values+Forecast Values, forecast data Confidence Intervals
-funggcast<-function(dn,fcast){ 
- 
-	en<-length(fcast$fitted) #extract the max date used in the forecast
- 
-	#Extract Source and Training Data
-	ds<-as.data.frame(dn)
-	names(ds)<-'observed'
-	ds$date<-index(dn)
- 
-	#Extract the Fitted Values (need to figure out how to grab confidence intervals)
-	dfit<-as.data.frame(fcast$fitted)
-	dfit$date<-index(dn)[1:en]
-	names(dfit)[1]<-'fitted'
- 
-	ds<-merge(ds,dfit,all.x=T) #Merge fitted values with source and training data
- 
-	#Exract the Forecast values and confidence intervals
-	dfcastn<-as.data.frame(fcast)
-	dfcastn$date<-index(dn)[(en+1):length(dn)]
-	names(dfcastn)<-c('forecast','lo80','hi80','lo95','hi95','date')
- 
-	pd<-merge(ds,dfcastn,all.x=T) #final data.frame for use in ggplot
-	return(pd)
- 
-}
-
-
-```
 
 ### 3.3.1 ARIMA autoregressif d'ordre 1
 
@@ -414,9 +434,9 @@ yt<-x3[1:(length(x3)-f_win)]
 model_AR <- arima(yt, order = c(1,0,0))
 
 pd_AR <- funggcast(x3, forecast(model_AR, h = f_win))
-p1a<-ggplot(data=pd_AR,aes(x=date,y=observed)) 
+p1a<-ggplot(data=pd_AR,aes(x=date,y=observed))
 p1a<- p1a + geom_line(aes(color = "1"))
-p1a<- p1a + geom_line(aes(y = fitted,color="2")) 
+p1a<- p1a + geom_line(aes(y = fitted,color="2"))
 p1a<- p1a + geom_line(aes(y = forecast,color="3"))
 p1a<- p1a + scale_colour_manual(values=c("red", "blue","black"),labels = c("Observed", "Fitted", "Forecasted"),name="Data")
 p1a<- p1a + geom_ribbon(aes(ymin=lo95,ymax=hi95),alpha=.25)
@@ -427,7 +447,7 @@ p1a<-p1a+theme(axis.text.x=element_text(size=10))
 
 p1a
 
-
+# plot(forecast(model_AR, h = f_win))
 
 # dygraph(xts(x=pd_AR[,-c(1,5,6)], order.by = pd_AR[,1]), "Frequence des camions - ARIMA AR") %>%
 #   dySeries("observed", label = "Real") %>%
@@ -435,16 +455,7 @@ p1a
 #   dySeries(c("lo95", "forecast", "hi95"), label = "Predicted") %>%
 #   dyRangeSelector()
 
-#plot(forecast(model_AR, 168))
-
-
-# plot(model_AR$residuals)
-# acf(model_AR$residuals)
-# pacf(model_AR$residuals)
-
 ```
-</br>
-</br>
 
 ### 3.3.2 ARIMA moyenne mobile d'ordre 1
 
@@ -671,7 +682,7 @@ rbind.data.frame("Modèle AR" = accuracy(model_AR),
 </br>
 </br>
 
-```{r "Holt winters simple", echo=FALSE, message=FALSE, warning=FALSE}
+```{r "Holt winters simple", echo=FALSE, warning=FALSE}
 #Simple exponential smoothing
 siwim_data_hw_ses <- HoltWinters(yt ,beta = FALSE, 
                                  gamma = FALSE)
@@ -702,7 +713,7 @@ p1h
 </br>
 </br>
 
-```{r "Holt winters", echo=FALSE, message=FALSE, warning=FALSE}
+```{r "Holt winters", echo=FALSE, warning=FALSE}
 
 #Exponential smoothing
 siwim_data_hw_es <- HoltWinters(yt, gamma = FALSE)
