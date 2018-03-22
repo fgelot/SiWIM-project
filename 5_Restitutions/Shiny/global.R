@@ -20,7 +20,7 @@ library(shinydashboard)
 
 ## Chargement des données et modèles
 
-setwd("D:/Dropbox/Data science/Formation CEPE/Projet/GitHub/SiWIM-project")
+setwd("D:/Dropbox/Data science/Formation CEPE/Projet/New_GitHub/SiWIM-project")
 #source("Time series SIWIM initialization.R", local = T)
 source("4_Scripts/4_Time series models/Time series SIWIM before models.R", local = T)
 #setwd("D:/Dropbox/Data science/Formation CEPE/Projet/")
