@@ -3,6 +3,7 @@ title: "Suite de l'analyse descriptive du jeu de données SIWIM"
 output: 
   html_document:
     theme: "united"
+    fig_width: 10
     df_print: paged
 ---
 

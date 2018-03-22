@@ -1,12 +1,13 @@
 ---
-title: "Découverte du jeu de données du projet SIWIM"
+title: "Description des données et gestion des données manquantes et aberrantes"
 output: 
   html_document:
     theme: "united"
+    fig_width: 10
     df_print: paged
 ---
 
-```{r "setup", include=FALSE}
+```{r "setup", include=FALSE, message=FALSE, warning=FALSE, echo = FALSE}
 # Configuration locale du chemin du projet SIWIM :
 knitr::opts_knit$set(root.dir = normalizePath("Z:/Data Science/R/SiWIM-project"))
 ```
@@ -15,12 +16,13 @@ knitr::opts_knit$set(root.dir = normalizePath("Z:/Data Science/R/SiWIM-project")
 ## chargement des librairies 
 
 library(data.table)
-library(stringr) # manipulation de chaine de caracteres
-library(missMDA) # imputation des données manquantes
-library(questionr) # calcul Vcramer et des fréquences
+library(stringr)  # manipulation de chaine de caracteres
+library(missMDA)  # imputation des données manquantes
+library(questionr)# calcul Vcramer et des fréquences
+library(corrplot) # affichage matrice des correlations
 library(ggplot2)
-library(cowplot) # grilles de graphiques
-library(reshape2)# plot des valeurs manquantes
+library(cowplot)  # grilles de graphiques
+library(reshape2) # plot des valeurs manquantes
 ```
 
 ```{r, message=FALSE, warning=FALSE, echo = FALSE}
@@ -77,7 +79,7 @@ siwim_data[, Jour_semaine := as.factor(strftime(siwim_data$Date, format = "%A"))
 siwim_data[, Heure := as.factor(str_sub(Horaire, 1, 2))]
 ```
 
-```{r, message=FALSE, echo = FALSE}
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
 # Creation de la variable qualitative Anomalie
 siwim_data[,Anomalie := "N"][Warning_flags != "00000000",Anomalie := "Y"]
 
@@ -114,7 +116,7 @@ siwim_data [, c("v","WGV", "W1","W2","W3","W4","W5","W6","W7","W8","W9","W10",
          "W11","W12","W13","W14","W15","W16") := NULL]
 ```
 
-# Description des données
+# 1. Description des données
 
 Le jeu de données contient 54 variables et environ 184 000 lignes :
 
@@ -122,7 +124,7 @@ Chaque ligne représente les valeurs des variables pour un camion capturé par l
 
 Il est important de rappeler que le système comporte sa propre fiabilité et est possiblement amené à capturer du bruit ou à dysfonctionner.
 
-Nous notons ici la présence de nombreuses valeur manquantes ou de valeur aberrantes lorsque nous analysons par exemple les minimum ou les maximum de certaines variables.
+Nous notons ici la présence de nombreuses valeur manquantes ou de valeur aberrantes lorsque nous analysons par exemple les minimums ou les maximums de certaines variables.
 
 
 ```{r, message=FALSE, warning=FALSE, echo = FALSE}
@@ -133,9 +135,7 @@ varquali <- siwim_data[,lapply(siwim_data,is.numeric) == FALSE, with = FALSE]
 ```
 
 
-# Quelques graphiques
-
-```{r}
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
 # creation de jeux de données pour affichages graphiques
 
 # Jeu de données des variables quantitatives
@@ -144,81 +144,125 @@ var_quali_graph <- varquali[,c("Lane", "Nb_axles", "Annee","Mois_annee","Jour_se
 # Jeu de données des variables qualitatives
 var_quanti_graph <- varquanti[,c("N","total_axle_dist","T","Reduced_chi_squared","Time_num","Vitesse","MGV")]
 
+# On reordonne les facteur pour les affichages
+
+# Mois
+var_quali_graph$Mois_annee = factor(var_quali_graph$Mois_annee,levels =c("juillet","août","septembre", "octobre", "novembre"))
+
+# Jour semaine
+var_quali_graph$Jour_semaine <- factor(var_quali_graph$Jour_semaine,c("lundi","mardi","mercredi","jeudi","vendredi", "samedi", "dimanche"))
+
+
 # Jeu de données globales, simplifiées, avant traitement des valeurs manquantes
 var_graph <- cbind.data.frame(var_quali_graph,var_quanti_graph)
 ```
 
-## Contexte de passage du camion (variables qualitatives)
+## 2. Contexte de passage du camion (variables qualitatives)
 
 Disposer ici quelques graphiques illustrant les données et montrant les valeurs manquantes
 
-```{r}
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+
 
 # geom_bar
 # Mois de passage
 p7 <- ggplot(var_quali_graph,aes(x = Mois_annee)) +  
   geom_bar(color="black",fill= "pink") + 
-  labs(title = "Mois de passage", x ="Mois", y ="Nb") + 
+  labs(title = "Mois de passage du camion", x ="Mois", y ="Effectifs") + 
   background_grid(major = "xy", minor = "none")
 
-# pie plot
+# Jour de passage
+p8 <- ggplot(var_quali_graph,aes(x = Jour_semaine)) +  
+  geom_bar(color="black",fill= "pink") + 
+  labs(title = "Jour de passage du camion", x ="Jour", y ="Effectifs") + 
+  background_grid(major = "xy", minor = "none")
+
+# Heure de passage
+p9 <- ggplot(var_quali_graph,aes(x = Heure)) +  
+  geom_bar(color="black",fill= "pink") + 
+  labs(title = "Heure de passage du camion", x ="Heure", y ="Effectifs") + 
+  background_grid(major = "xy", minor = "none")
+
+# Voie de passage
+p10 <- ggplot(var_quali_graph,aes(x = Lane)) +  
+  geom_bar(color="black",fill= "pink") + 
+  labs(title = "Voie de passage du camion", x ="Voie", y ="Effectifs") + 
+  background_grid(major = "xy", minor = "none")
+
+# Anomalie
+p11 <- ggplot(var_quali_graph,aes(x = Anomalie)) +  
+  geom_bar(color="black",fill= "pink") + 
+  labs(title = "Anomalie lors du passage du camion", x ="Y = oui, N = Non", y ="Effectifs") + 
+  background_grid(major = "xy", minor = "none")
+
+
 
 
 ```
 
 
-## Descripteurs des camions (variables quantitatives)
+```{r, message=FALSE, warning=FALSE, echo = FALSE, fig.height=6}
+plot_grid(p7,p8,p9,p10,p11, ncol = 2, nrow = 3)
+```
+En résumé :
 
-```{r}
+- Les données ont été recueillies durant 5 mois
+- Les camions circulent pour la plupart hors week end, et entre 6h et 19h
+- Les données enregistrées portent essentiellement sur des camions ayant roulé à droite
+- 30 % des camions on déclenché une anomalie au niveau du système de pesage
+
+
+## 3. Descripteurs des camions (variables quantitatives)
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
 # Histogramme
 
 # Nombre d'essieux
 p1 <- ggplot(var_quanti_graph,aes(x = N)) +  
   geom_histogram(color="black",fill= "lightblue",binwidth=1) + 
-  labs(title = "Essieux", x ="Nombre d'essieux", y ="Nb") + 
+  labs(title = "Essieux", x ="Nombre d'essieux", y ="Effectifs") + 
   geom_vline(aes(xintercept=mean(N)),color="blue", linetype="dashed", size=1)+ 
   background_grid(major = "xy", minor = "none")
 
 # Vitesse
 p2 <- ggplot(var_quanti_graph,aes(x = Vitesse)) +  
   geom_histogram(color="black",fill= "lightblue",binwidth=1) +
-  labs(title = "Vitesse", x ="Vitesse (km/h)", y ="Nb") +
+  labs(title = "Vitesse", x ="Vitesse (km/h)", y ="Effectifs") +
   geom_vline(aes(xintercept=mean(Vitesse)),color="blue", linetype="dashed", size=1) + 
   background_grid(major = "xy", minor = "none") 
 
 # Masse du camion
 p3 <- ggplot(var_quanti_graph,aes(x = MGV)) +  
   geom_histogram(color="black",fill= "lightblue",binwidth=1) + 
-  labs(title = "Masse du camion", x ="Masse (tonnes)", y ="Nb") + 
+  labs(title = "Masse du camion", x ="Masse (tonnes)", y ="Effectifs") + 
   geom_vline(aes(xintercept=mean(MGV)),color="blue", linetype="dashed", size=1) + 
   background_grid(major = "xy", minor = "none") 
 
 # Distance maximale entre les essieux
 p4 <- ggplot(var_quanti_graph,aes(x = total_axle_dist)) +  
   geom_histogram(color="black",fill= "lightblue",binwidth=1) + 
-  labs(title = "Distance entre essieux", x ="Distance (m)", y ="Nb") + 
+  labs(title = "Distance entre essieux", x ="Distance (m)", y ="Effectifs") + 
   geom_vline(aes(xintercept=mean(total_axle_dist)),color="blue", linetype="dashed", size=1) + 
   background_grid(major = "xy", minor = "none") 
 
 # Temperature du systeme de pesage
 p5 <- ggplot(var_quanti_graph,aes(x = T)) +  
   geom_histogram(color="black",fill= "lightblue",binwidth=1) + 
-  labs(title = "Température du systeme", x ="Temperature (°C)", y ="Nb") + 
+  labs(title = "Température du systeme", x ="Temperature (°C)", y ="Effectifs") + 
   geom_vline(aes(xintercept=mean(T)),color="blue", linetype="dashed", size=1) + 
   background_grid(major = "xy", minor = "none")
 
 # Chi2 reduit
 p6 <- ggplot(var_quanti_graph,aes(x = Reduced_chi_squared)) +  
   geom_histogram(color="black",fill= "lightblue",binwidth=1) + 
-  labs(title = "Chi2 reduit", x ="Chi2", y ="Nb") + 
+  labs(title = "Chi2 reduit", x ="Chi2", y ="Effectifs") + 
   geom_vline(aes(xintercept=mean(Reduced_chi_squared)),color="blue", linetype="dashed", size=1) + 
   background_grid(major = "xy", minor = "none")
 
 
-
 ```
 
-```{r, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE, echo = FALSE, fig.height=6}
 plot_grid(p1,p2,p3,p4,p5,p6, ncol = 2, nrow = 3)
 ```
 
@@ -229,18 +273,25 @@ Plusieurs valeurs aberrantes physiquement, des camions :
 - Pesant 140 tonnes
 - Mesurant 80 mètres
 
-Et une série de températures du sytème observée à -273 °C
+Et une série de températures du sytème observée à -273 °C !
 
 
-# Traitement des valeurs manquantes et aberrantes
+# 4. Traitement des valeurs manquantes et aberrantes
 
-On observe donc :
 
-**Idée générale** : attribuer aux données aberrantes (dont nous sommes surs qu'elles soient fausses) un valeur "NA" puis reconstituer leur valeur grasse aux techniques d'imputation du package `"missMDA"`.
+**Idée générale** : attribuer aux données aberrantes (dont nous sommes surs qu'elles soient fausses) un valeur "NA" puis reconstituer leur valeur grace aux techniques d'imputation du package `"missMDA"`.
 
 Les seuils sont fixés à partir de la connaissance métier.
 
-```{r, echo = FALSE}
+Ainsi on considère comme valeure aberrante 
+- un nombre d'essieux supérieur à 8
+- une distance totale entre les axes > à 20 m
+- les températures négatives < à -10°C
+- la vitesse d'un camion > à 130 km/h
+- la masse d'un camion > à 70 T ou égale à 0
+
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
 # On considere qu'une valeur supérieure à 8 essieux est aberrante
 siwim_data[siwim_data$N > 8, N := NA]
 siwim_data[is.na(siwim_data$N), Nb_axles := NA]
@@ -262,9 +313,9 @@ siwim_data [, c("A8", "A9","A10","A11","A12","A13","A14","A15","M9","M10",
                 "M11","M12","M13","M14","M15","M16") := NULL]
 ```
 
+Le remplacement des valeurs aberrantes par "NA" génère donc des valeurs manquantes :
 
-
-```{r}
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
 # graphiques des valeurs manquantes
 
 # Fonction d'affichage
@@ -287,59 +338,40 @@ ggplot_missing <- function(x){
 
 ```
 
-```{r}
+```{r,message=FALSE, warning=FALSE, echo = FALSE, eval= FALSE}
 # Graphique des valeurs manquantes
 ggplot_missing(siwim_data[,c("Lane", "Nb_axles","Annee","Mois_annee","Jour_semaine","Heure","Anomalie",
                              "N","total_axle_dist","T","Reduced_chi_squared","Time_num","Vitesse","MGV")])
 
 ```
 
-Ce graphique affiche les valeurs "NA"
 
-
-
-```{r}
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
 # bar plot de la proportion de valeurs manquantes par variables
 
-```
-
-
-
-```{r, echo = FALSE}
-# Jeu de donnée contenant seulement les variables utiles pour l'imputation
-siwim_data_imput <- siwim_data[, c( "Lane", "N", "Nb_axles", "Anomalie", "total_axle_dist", "T", 
-   "Reduced_chi_squared", "Time_num", "Vitesse", "MGV")]
 ```
 
 L'imputation est réalisée par analyse factorielle des données multiples (FAMD) du package `Factominer`.
 Nous retenons l'information apportée par 7 axes factoriels :
 
-```{r, echo = FALSE}
-siwim_data_inputted <- imputeFAMD(siwim_data_imput, ncp = 7, method = "Regularized")
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# Jeu de donnée contenant seulement les variables utiles pour l'imputation
+siwim_data_imput <- siwim_data[, c( "Lane", "N", "Nb_axles", "Anomalie", "total_axle_dist", "T", 
+   "Reduced_chi_squared", "Time_num", "Vitesse", "MGV")]
 ```
 
 
-```{r, echo = FALSE}
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+
+# Imputation
+siwim_data_inputted <- imputeFAMD(siwim_data_imput, ncp = 7, method = "Regularized")
+
 # Transformation en data frame :
 siwim_data_inputted <- as.data.frame(siwim_data_inputted$completeObs)
-```
 
-On concatène les variables imputées avec les colonnes initiales
-```{r, echo = FALSE}
+# On concatène les variables imputées avec les colonnes initiales
 siwim_data_inputted_final <- cbind(siwim_data[, -c( "Lane","N", "Nb_axles", "Anomalie", "total_axle_dist", "T", "Reduced_chi_squared", "Time_num", "Vitesse", "MGV")],siwim_data_inputted)
-```
 
-Voici le résumé du jeu de données final après imputation, en comparaison de celui obtenu initialement :
-
-```{r, echo = FALSE}
-summary(siwim_data[,.( Lane,N, Nb_axles, Anomalie, total_axle_dist, T, Reduced_chi_squared, Time_num, Vitesse, MGV)])
-summary(siwim_data_inputted_final[,.( Lane,N, Nb_axles, Anomalie, total_axle_dist, T, Reduced_chi_squared, Time_num, Vitesse, MGV)])
-```
-
-L'imputation semble donner de bons résultats. Etant basée sur une méthode d'estimation, les valeurs imputées peuvent de nouveaux franchir les limites fixées.
-Nous pouvons soit les supprimer, soit imputer aux valeurs limites de manière à conserver la donnée et donc le plus d'information possible.
-
-```{r, echo = FALSE}
 # Fixation aux valeurs limites pour les imputations qui auraient franchies les limites théoriques
 siwim_data_inputted_final[N > 8, N := 8]
 siwim_data_inputted_final[total_axle_dist > 20, total_axle_dist := 20]
@@ -349,30 +381,118 @@ siwim_data_inputted_final[MGV < 0, MGV := 0.5]
 siwim_data_inputted_final[MGV > 70, MGV := 70]
 ```
 
+## Comparaison graphique post-imputation
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+
+# Variables quantitatives
+
+# Nombre d'essieux
+p1bis <- ggplot(siwim_data_inputted_final,aes(x = N)) +  
+  geom_histogram(color="black",fill= "lightblue",binwidth=1) + 
+  labs(title = "Essieux", x ="Nombre d'essieux", y ="Effectifs") + 
+  geom_vline(aes(xintercept=mean(N)),color="blue", linetype="dashed", size=1)+ 
+  background_grid(major = "xy", minor = "none")
+
+# Vitesse
+p2bis <- ggplot(siwim_data_inputted_final,aes(x = Vitesse)) +  
+  geom_histogram(color="black",fill= "lightblue",binwidth=1) +
+  labs(title = "Vitesse", x ="Vitesse (km/h)", y ="Effectifs") +
+  geom_vline(aes(xintercept=mean(Vitesse)),color="blue", linetype="dashed", size=1) + 
+  background_grid(major = "xy", minor = "none") 
+
+# Masse du camion
+p3bis <- ggplot(siwim_data_inputted_final,aes(x = MGV)) +  
+  geom_histogram(color="black",fill= "lightblue",binwidth=1) + 
+  labs(title = "Masse du camion", x ="Masse (tonnes)", y ="Effectifs") + 
+  geom_vline(aes(xintercept=mean(MGV)),color="blue", linetype="dashed", size=1) + 
+  background_grid(major = "xy", minor = "none") 
+
+# Distance maximale entre les essieux
+p4bis <- ggplot(siwim_data_inputted_final,aes(x = total_axle_dist)) +  
+  geom_histogram(color="black",fill= "lightblue",binwidth=1) + 
+  labs(title = "Distance entre essieux", x ="Distance (m)", y ="Effectifs") + 
+  geom_vline(aes(xintercept=mean(total_axle_dist)),color="blue", linetype="dashed", size=1) + 
+  background_grid(major = "xy", minor = "none") 
+
+# Temperature du systeme de pesage
+p5bis <- ggplot(siwim_data_inputted_final,aes(x = T)) +  
+  geom_histogram(color="black",fill= "lightblue",binwidth=1) + 
+  labs(title = "Température du systeme", x ="Temperature (°C)", y ="Effectifs") + 
+  geom_vline(aes(xintercept=mean(T)),color="blue", linetype="dashed", size=1) + 
+  background_grid(major = "xy", minor = "none")
+
+# Chi2 reduit
+p6bis <- ggplot(siwim_data_inputted_final,aes(x = Reduced_chi_squared)) +  
+  geom_histogram(color="black",fill= "lightblue",binwidth=1) + 
+  labs(title = "Chi2 reduit", x ="Chi2", y ="Effectifs") + 
+  geom_vline(aes(xintercept=mean(Reduced_chi_squared)),color="blue", linetype="dashed", size=1) + 
+  background_grid(major = "xy", minor = "none")
+
+```
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE, fig.height=6}
+plot_grid(p1bis,p2bis,p3bis,p4bis,p5bis,p6bis, ncol = 2, nrow = 3)
+```
 
 
-
-
-
-
+L'imputation semble donner de bons résultats. Etant basée sur une méthode d'estimation, les valeurs imputées peuvent de nouveaux franchir les limites fixées.
+Nous pouvons soit les supprimer, soit imputer aux valeurs limites de manière à conserver la donnée et donc le plus d'information possible.
 
 La deuxième approche consiste à éliminer les individus ayant des valeurs manquantes et / ou aberrantes.
 
-```{r, echo = FALSE}
-## Suppression des individus comportant des donnees manquantes
-siwim_data_missing_del <- siwim_data[!is.na(siwim_data$N)
-                                            & !is.na(siwim_data$total_axle_dist) 
-                                            & !is.na(siwim_data$T)
-                                            & !is.na(siwim_data$Vitesse)
-                                            & !is.na(siwim_data$MGV)]
+# 5. Analyse bidimensionnelle (étude des liaisons)
+
+## 5.1 Etude des liaisons entre variables qualitatives (V de Cramer)
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# On travaille avec un sous ensemble utiles des variables qualitatives
+varquali2 <- siwim_data_inputted_final[,.(Warning_flags,Subclass_ID,Axle_groups,Mois_annee,Jour_semaine,Heure,Lane,Nb_axles,Anomalie)]
+varquali2 <- as.data.frame(varquali2)
 ```
 
-Résumé des données sans ces valeurs aberrantes :
 
-```{r, echo = FALSE}
-summary(siwim_data_missing_del[,.( Lane,N, Nb_axles, Anomalie, total_axle_dist, T, Reduced_chi_squared, Time_num, Vitesse, MGV)])
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# liaisons entre variables qualitatives (calcul du V de Cramer)
+cramer <- matrix(NA, ncol(varquali2), ncol(varquali2))
+for (i in (1:ncol(varquali2))){
+  for (j in (1:ncol(varquali2))){
+    cramer[i,j] <- cramer.v(table(varquali2[,i], varquali2[,j]))
+  }
+}
+
+colnames(cramer) <- colnames(varquali2)
+rownames(cramer) <- colnames(varquali2)
+
+corrplot(cramer, method="number")
 ```
 
-Nous constatons que les deux méthodes semblent aboutir à des résultats similaires : les résumés montrent que les valeur prises par les indicateurs de dispersion et de position restent semblables.
+Le V de Cramer offre une mesure absolue (valeur comprise de 0 à 1), de l'intensité de la liaison entre deux variables qualitatives.
 
+Liaison forte (V > 0.3) entre :
+ - la classification réalisée par le système `SubClasss_ID` et le groupe d'essieux `Axle_Group` (V = 0.54)
+ 
+ - la classification réalisée par le système `SubClasss_ID` et `Nb_axles` le nombre d'essieux
+ 
+Liaison totale (V = 1) entre :
+- `Warning_flags` et `Anomalie`(variable reconstruite signalant la présente d'un warning)
+- Le nombre d'essieux `Nb_axles` et le groupe d'essieux `Axle_Group`
+
+
+## 5.2 Etude des liaisons entre variables quantitatives (corrélation de Pearson)
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# On travaille avec un sous ensemble utiles des variables quantitatives
+varquanti2 <- siwim_data_inputted_final[,c("N", "total_axle_dist","T","Reduced_chi_squared","Time_num","Vitesse","MGV")]
+```
+
+Nous calculons le coefficient de corrélation linéaire de Pearson entre les variables quantitatives :
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# Matrice de correlation (Pearson) 
+corr <- cor(varquanti2)
+corrplot(corr, method="number")
+```
+
+Nous constatons de nombreuses relations linéaires entre les grandeurs physiques (masse, longueur, vitesse,...)
 
