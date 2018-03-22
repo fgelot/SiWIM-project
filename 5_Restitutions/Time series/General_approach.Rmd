@@ -376,18 +376,18 @@ funggcast<-function(dn,fcast){
 	#Extract Source and Training Data
 	ds<-as.data.frame(dn)
 	names(ds)<-'observed'
-	ds$date<-index(x3)
+	ds$date<-index(dn)
  
 	#Extract the Fitted Values (need to figure out how to grab confidence intervals)
 	dfit<-as.data.frame(fcast$fitted)
-	dfit$date<-index(x3)[1:en]
+	dfit$date<-index(dn)[1:en]
 	names(dfit)[1]<-'fitted'
  
 	ds<-merge(ds,dfit,all.x=T) #Merge fitted values with source and training data
  
 	#Exract the Forecast values and confidence intervals
 	dfcastn<-as.data.frame(fcast)
-	dfcastn$date<-index(x3)[(en+1):length(dn)]
+	dfcastn$date<-index(dn)[(en+1):length(dn)]
 	names(dfcastn)<-c('forecast','lo80','hi80','lo95','hi95','date')
  
 	pd<-merge(ds,dfcastn,all.x=T) #final data.frame for use in ggplot
@@ -400,7 +400,7 @@ funggcast<-function(dn,fcast){
 
 ### 3.3.1 ARIMA autoregressif d'ordre 1
 
-```{r "ARIMA AR", echo=FALSE}
+```{r "ARIMA AR", echo=FALSE, warning=FALSE}
 # AR model 
 
 # forecast window
@@ -415,23 +415,25 @@ model_AR <- arima(yt, order = c(1,0,0))
 
 pd_AR <- funggcast(x3, forecast(model_AR, h = f_win))
 p1a<-ggplot(data=pd_AR,aes(x=date,y=observed)) 
-p1a<-p1a+geom_line(col='red')
-p1a<-p1a+geom_line(aes(y=fitted),col='blue')
-p1a<-p1a+geom_line(aes(y=forecast))+geom_ribbon(aes(ymin=lo95,ymax=hi95),alpha=.25)
-p1a<-p1a+scale_x_datetime(name='',breaks=date_breaks('8 hours'),minor_breaks= date_breaks('1 hour'),labels=date_format("%Y-%m-%d %H"),expand=c(0,0))
-p1a<-p1a+scale_y_continuous(name='Units of Y')
-p1a <- p1a + labs(title='Arima Fit to Simulated Data\n (black=forecast, blue=fitted, red=data, shadow=95% conf. interval)')
+p1a<- p1a + geom_line(aes(color = "1"))
+p1a<- p1a + geom_line(aes(y = fitted,color="2")) 
+p1a<- p1a + geom_line(aes(y = forecast,color="3"))
+p1a<- p1a + scale_colour_manual(values=c("red", "blue","black"),labels = c("Observed", "Fitted", "Forecasted"),name="Data")
+p1a<- p1a + geom_ribbon(aes(ymin=lo95,ymax=hi95),alpha=.25)
+# p1a<-p1a+scale_x_datetime(name='',breaks=date_breaks('8 hours'),minor_breaks= date_breaks('1 hour'),labels=date_format("%Y-%m-%d %H"),expand=c(0,0))
+p1a<-p1a+scale_y_continuous(name='Fréquence')
+p1a <- p1a + labs(title='Frequence des camions - ARIMA AR (Intervalle de confiance à 95%)')
 p1a<-p1a+theme(axis.text.x=element_text(size=10))
 
-#p1a
+p1a
 
 
 
-dygraph(xts(x=pd_AR[,-c(1,5,6)], order.by = pd_AR[,1]), "Frequence des camions - ARIMA AR") %>%
-  dySeries("observed", label = "Real") %>%
-  dySeries("fitted", label = "Fitted") %>%
-  dySeries(c("lo95", "forecast", "hi95"), label = "Predicted") %>%
-  dyRangeSelector()
+# dygraph(xts(x=pd_AR[,-c(1,5,6)], order.by = pd_AR[,1]), "Frequence des camions - ARIMA AR") %>%
+#   dySeries("observed", label = "Real") %>%
+#   dySeries("fitted", label = "Fitted") %>%
+#   dySeries(c("lo95", "forecast", "hi95"), label = "Predicted") %>%
+#   dyRangeSelector()
 
 #plot(forecast(model_AR, 168))
 
@@ -446,20 +448,34 @@ dygraph(xts(x=pd_AR[,-c(1,5,6)], order.by = pd_AR[,1]), "Frequence des camions -
 
 ### 3.3.2 ARIMA moyenne mobile d'ordre 1
 
-```{r "ARIMA MA", echo=FALSE}
+```{r "ARIMA MA", echo=FALSE, warning=FALSE}
 # MA model
 model_MA <- arima(yt, order = c(0,0,8))
 # accuracy(model_MA)
 
 pd_MA <- funggcast(x3, forecast(model_MA, h = f_win))
 
+p2a<-ggplot(data=pd_MA,aes(x=date,y=observed)) 
+p2a<- p2a + geom_line(aes(color = "1"))
+p2a<- p2a + geom_line(aes(y = fitted,color="2")) 
+p2a<- p2a + geom_line(aes(y = forecast,color="3"))
+p2a<- p2a + scale_colour_manual(values=c("red", "blue","black"),labels = c("Observed", "Fitted", "Forecasted"),name="Data")
+p2a<- p2a + geom_ribbon(aes(ymin=lo95,ymax=hi95),alpha=.25)
+# p1a<-p1a+scale_x_datetime(name='',breaks=date_breaks('8 hours'),minor_breaks= date_breaks('1 hour'),labels=date_format("%Y-%m-%d %H"),expand=c(0,0))
+p2a<-p2a+scale_y_continuous(name='Fréquence')
+p2a <- p2a + labs(title='Frequence des camions - ARIMA MA (Intervalle de confiance à 95%)')
+p2a<-p2a+theme(axis.text.x=element_text(size=10))
+
+p2a
+
+
 #plot(forecast(model_MA, 168))
 
-dygraph(xts(x=pd_MA[,-c(1,5,6)], order.by = pd_MA[,1]), "Frequence des camions - ARIMA MA") %>%
-  dySeries("observed", label = "Real") %>%
-  dySeries("fitted", label = "Fitted") %>%
-  dySeries(c("lo95", "forecast", "hi95"), label = "Predicted") %>%
-  dyRangeSelector()
+# dygraph(xts(x=pd_MA[,-c(1,5,6)], order.by = pd_MA[,1]), "Frequence des camions - ARIMA MA") %>%
+#   dySeries("observed", label = "Real") %>%
+#   dySeries("fitted", label = "Fitted") %>%
+#   dySeries(c("lo95", "forecast", "hi95"), label = "Predicted") %>%
+#   dyRangeSelector()
 # 
 # plot(model_MA$residuals)
 # acf(model_MA$residuals)
@@ -472,7 +488,7 @@ dygraph(xts(x=pd_MA[,-c(1,5,6)], order.by = pd_MA[,1]), "Frequence des camions -
 ### 3.3.3 ARIMA autoregressif d'ordre 1 et moyenne mobile d'ordre 8
 
 
-```{r "ARIMA ARMA", echo=FALSE}
+```{r "ARIMA ARMA", echo=FALSE, warning=FALSE}
 
 # Composite model
 model_ARMA <- arima(yt, order = c(1,0,8))
@@ -482,11 +498,24 @@ model_ARMA <- arima(yt, order = c(1,0,8))
 
 pd_ARMA <- funggcast(x3, forecast(model_ARMA, h = f_win))
 
-dygraph(xts(x=pd_ARMA[,-c(1,5,6)], order.by = pd_ARMA[,1]), "Frequence des camions - ARIMA ARMA") %>%
-  dySeries("observed", label = "Real") %>%
-  dySeries("fitted", label = "Fitted") %>%
-  dySeries(c("lo95", "forecast", "hi95"), label = "Predicted") %>%
-  dyRangeSelector()
+p3a<-ggplot(data=pd_ARMA,aes(x=date,y=observed)) 
+p3a<- p3a + geom_line(aes(color = "1"))
+p3a<- p3a + geom_line(aes(y = fitted,color="2")) 
+p3a<- p3a + geom_line(aes(y = forecast,color="3"))
+p3a<- p3a + scale_colour_manual(values=c("red", "blue","black"),labels = c("Observed", "Fitted", "Forecasted"),name="Data")
+p3a<- p3a + geom_ribbon(aes(ymin=lo95,ymax=hi95),alpha=.25)
+# p1a<-p1a+scale_x_datetime(name='',breaks=date_breaks('8 hours'),minor_breaks= date_breaks('1 hour'),labels=date_format("%Y-%m-%d %H"),expand=c(0,0))
+p3a<-p3a+scale_y_continuous(name='Fréquence')
+p3a <- p3a + labs(title='Frequence des camions - ARIMA ARMA (Intervalle de confiance à 95%)')
+p3a<-p3a+theme(axis.text.x=element_text(size=10))
+
+p3a
+
+# dygraph(xts(x=pd_ARMA[,-c(1,5,6)], order.by = pd_ARMA[,1]), "Frequence des camions - ARIMA ARMA") %>%
+#   dySeries("observed", label = "Real") %>%
+#   dySeries("fitted", label = "Fitted") %>%
+#   dySeries(c("lo95", "forecast", "hi95"), label = "Predicted") %>%
+#   dyRangeSelector()
 
 # autoplot(model_ARMA$residuals)
 # autoplot(acf(model_ARMA$residuals))
@@ -498,7 +527,7 @@ dygraph(xts(x=pd_ARMA[,-c(1,5,6)], order.by = pd_ARMA[,1]), "Frequence des camio
 
 ### 3.3.4 ARIMA auto
 
-```{r "auto ARIMA", echo=FALSE}
+```{r "auto ARIMA", echo=FALSE, warning=FALSE}
 
 # Auto ARIMA model
 model_auto_ARMA <- auto.arima(yt)
@@ -509,11 +538,24 @@ model_auto_ARMA <- auto.arima(yt)
 
 pd_auto_ARIMA <- funggcast(x3, forecast(model_auto_ARMA, h = f_win))
 
-dygraph(xts(x=pd_auto_ARIMA[,-c(1,5,6)], order.by = pd_auto_ARIMA[,1]), "Frequence des camions - ARIMA auto") %>%
-  dySeries("observed", label = "Real") %>%
-  dySeries("fitted", label = "Fitted") %>%
-  dySeries(c("lo95", "forecast", "hi95"), label = "Predicted") %>%
-  dyRangeSelector()
+p4a<-ggplot(data=pd_auto_ARIMA,aes(x=date,y=observed)) 
+p4a<- p4a + geom_line(aes(color = "1"))
+p4a<- p4a + geom_line(aes(y = fitted,color="2")) 
+p4a<- p4a + geom_line(aes(y = forecast,color="3"))
+p4a<- p4a + scale_colour_manual(values=c("red", "blue","black"),labels = c("Observed", "Fitted", "Forecasted"),name="Data")
+p4a<- p4a + geom_ribbon(aes(ymin=lo95,ymax=hi95),alpha=.25)
+# p1a<-p1a+scale_x_datetime(name='',breaks=date_breaks('8 hours'),minor_breaks= date_breaks('1 hour'),labels=date_format("%Y-%m-%d %H"),expand=c(0,0))
+p4a<-p4a+scale_y_continuous(name='Fréquence')
+p4a <- p4a + labs(title='Frequence des camions - ARIMA auto (Intervalle de confiance à 95%)')
+p4a<-p4a+theme(axis.text.x=element_text(size=10))
+
+p4a
+
+# dygraph(xts(x=pd_auto_ARIMA[,-c(1,5,6)], order.by = pd_auto_ARIMA[,1]), "Frequence des camions - ARIMA auto") %>%
+#   dySeries("observed", label = "Real") %>%
+#   dySeries("fitted", label = "Fitted") %>%
+#   dySeries(c("lo95", "forecast", "hi95"), label = "Predicted") %>%
+#   dyRangeSelector()
 
 # autoplot(model_auto_ARMA$residuals)
 # autoplot(acf(model_auto_ARMA$residuals))
@@ -524,7 +566,7 @@ dygraph(xts(x=pd_auto_ARIMA[,-c(1,5,6)], order.by = pd_auto_ARIMA[,1]), "Frequen
 
 ### 3.3.5 ARIMA avec une saisonnalité (24 heures)
 
-```{r "ARIMA season", echo=FALSE}
+```{r "ARIMA season", echo=FALSE, warning=FALSE}
 
 ## auto arima with season
 
@@ -539,11 +581,24 @@ model_auto_ARMA_seas <- auto.arima(ts(data=yt,frequency = period))
 
 pd_auto_ARIMA_seas <- funggcast(x3, forecast(model_auto_ARMA_seas, h = f_win))
 
-dygraph(xts(x=pd_auto_ARIMA_seas[,-c(1,5,6)], order.by = pd_auto_ARIMA_seas[,1]), "Frequence des camions - ARIMA saison") %>%
-  dySeries("observed", label = "Real") %>%
-  dySeries("fitted", label = "Fitted") %>%
-  dySeries(c("lo95", "forecast", "hi95"), label = "Predicted") %>%
-  dyRangeSelector()
+p5a<-ggplot(data=pd_auto_ARIMA_seas,aes(x=date,y=observed)) 
+p5a<- p5a + geom_line(aes(color = "1"))
+p5a<- p5a + geom_line(aes(y = fitted,color="2")) 
+p5a<- p5a + geom_line(aes(y = forecast,color="3"))
+p5a<- p5a + scale_colour_manual(values=c("red", "blue","black"),labels = c("Observed", "Fitted", "Forecasted"),name="Data")
+p5a<- p5a + geom_ribbon(aes(ymin=lo95,ymax=hi95),alpha=.25)
+# p1a<-p1a+scale_x_datetime(name='',breaks=date_breaks('8 hours'),minor_breaks= date_breaks('1 hour'),labels=date_format("%Y-%m-%d %H"),expand=c(0,0))
+p5a<-p5a+scale_y_continuous(name='Fréquence')
+p5a <- p5a + labs(title='Frequence des camions - ARIMA saison (Intervalle de confiance à 95%)')
+p5a<-p5a+theme(axis.text.x=element_text(size=10))
+
+p5a
+
+# dygraph(xts(x=pd_auto_ARIMA_seas[,-c(1,5,6)], order.by = pd_auto_ARIMA_seas[,1]), "Frequence des camions - ARIMA saison") %>%
+#   dySeries("observed", label = "Real") %>%
+#   dySeries("fitted", label = "Fitted") %>%
+#   dySeries(c("lo95", "forecast", "hi95"), label = "Predicted") %>%
+#   dyRangeSelector()
 
 # autoplot(model_auto_ARMA_seas$residuals)
 # autoplot(acf(model_auto_ARMA_seas$residuals))
@@ -555,7 +610,7 @@ dygraph(xts(x=pd_auto_ARIMA_seas[,-c(1,5,6)], order.by = pd_auto_ARIMA_seas[,1])
 
 ### 3.3.6 ARIMA avec double saisonnalité (24 heures et 7 jours)
 
-```{r "ARIMA double seasons", echo=FALSE}
+```{r "ARIMA double seasons", echo=FALSE, warning=FALSE}
 
 ## auto arima with double seasons
 
@@ -566,15 +621,29 @@ model_auto_ARMA_double <- auto.arima(x6)
 
 # accuracy(model_auto_ARMA_double)
 
-#autoplot(forecast(model_auto_ARMA_double, 168))
+autoplot(forecast(model_auto_ARMA_double, f_win))
 
-pd_auto_ARIMA_double_seas <- funggcast(x3, forecast(model_auto_ARMA_double, h = f_win))
+# pd_auto_ARIMA_double_seas <- funggcast(x3, forecast(model_auto_ARMA_double, h = f_win))
+# 
+# p6a<-ggplot(data=pd_auto_ARIMA_double_seas,aes(x=date,y=observed)) 
+# p6a<- p6a + geom_line(aes(color = "1"))
+# p6a<- p6a + geom_line(aes(y = fitted,color="2")) 
+# p6a<- p6a + geom_line(aes(y = forecast,color="3"))
+# p6a<- p6a + scale_colour_manual(values=c("red", "blue","black"),labels = c("Observed", "Fitted", "Forecasted"),name="Data")
+# p6a<- p6a + geom_ribbon(aes(ymin=lo95,ymax=hi95),alpha=.25)
+# # p1a<-p1a+scale_x_datetime(name='',breaks=date_breaks('8 hours'),minor_breaks= date_breaks('1 hour'),labels=date_format("%Y-%m-%d %H"),expand=c(0,0))
+# p6a<-p6a+scale_y_continuous(name='Fréquence')
+# p6a <- p6a + labs(title='Frequence des camions - ARIMA double saison (Intervalle de confiance à 95%)')
+# p6a<-p6a+theme(axis.text.x=element_text(size=10))
+# 
+# p6a
 
-dygraph(xts(x=pd_auto_ARIMA_double_seas[,-c(1,5,6)], order.by = pd_auto_ARIMA_double_seas[,1]), "Frequence des camions - ARIMA double saison") %>%
-  dySeries("observed", label = "Real") %>%
-  dySeries("fitted", label = "Fitted") %>%
-  dySeries(c("lo95", "forecast", "hi95"), label = "Predicted") %>%
-  dyRangeSelector()
+
+# dygraph(xts(x=pd_auto_ARIMA_double_seas[,-c(1,5,6)], order.by = pd_auto_ARIMA_double_seas[,1]), "Frequence des camions - ARIMA double saison") %>%
+#   dySeries("observed", label = "Real") %>%
+#   dySeries("fitted", label = "Fitted") %>%
+#   dySeries(c("lo95", "forecast", "hi95"), label = "Predicted") %>%
+#   dyRangeSelector()
 
 
 # plot(model_auto_ARMA_double$residuals)
@@ -611,11 +680,24 @@ siwim_data_hw_ses <- HoltWinters(yt ,beta = FALSE,
 pd_hw_ses <- funggcast(x3, forecast(siwim_data_hw_ses, h = f_win))
 
 
-dygraph(xts(x=pd_hw_ses[,-c(1,5,6)], order.by = pd_hw_ses[,1]), "Frequence des camions - Simple Exponential Smoothing") %>%
-  dySeries("observed", label = "Real") %>%
-  dySeries("fitted", label = "Fitted") %>%
-  dySeries(c("lo95", "forecast", "hi95"), label = "Predicted") %>%
-  dyRangeSelector()
+p1h<-ggplot(data=pd_hw_ses,aes(x=date,y=observed))
+p1h<- p1h + geom_line(aes(color = "1"))
+p1h<- p1h + geom_line(aes(y = fitted,color="2"))
+p1h<- p1h + geom_line(aes(y = forecast,color="3"))
+p1h<- p1h + scale_colour_manual(values=c("red", "blue","black"),labels = c("Observed", "Fitted", "Forecasted"),name="Data")
+p1h<- p1h + geom_ribbon(aes(ymin=lo95,ymax=hi95),alpha=.25)
+# p1a<-p1a+scale_x_datetime(name='',breaks=date_breaks('8 hours'),minor_breaks= date_breaks('1 hour'),labels=date_format("%Y-%m-%d %H"),expand=c(0,0))
+p1h<-p1h+scale_y_continuous(name='Fréquence')
+p1h <- p1h + labs(title='Frequence des camions - Simple exponential smoothing \n (Intervalle de confiance à 95%)')
+p1h<-p1h+theme(axis.text.x=element_text(size=10), plot.title = element_text(hjust = 0.5))
+
+p1h
+
+# dygraph(xts(x=pd_hw_ses[,-c(1,5,6)], order.by = pd_hw_ses[,1]), "Frequence des camions - Simple Exponential Smoothing") %>%
+#   dySeries("observed", label = "Real") %>%
+#   dySeries("fitted", label = "Fitted") %>%
+#   dySeries(c("lo95", "forecast", "hi95"), label = "Predicted") %>%
+#   dyRangeSelector()
 ```
 </br>
 </br>
@@ -629,12 +711,24 @@ siwim_data_hw_es <- HoltWinters(yt, gamma = FALSE)
 
 pd_hw_es <- funggcast(x3, forecast(siwim_data_hw_es, h = f_win))
 
+p2h<-ggplot(data=pd_hw_es,aes(x=date,y=observed))
+p2h<- p2h + geom_line(aes(color = "1"))
+p2h<- p2h + geom_line(aes(y = fitted,color="2"))
+p2h<- p2h + geom_line(aes(y = forecast,color="3"))
+p2h<- p2h + scale_colour_manual(values=c("red", "blue","black"),labels = c("Observed", "Fitted", "Forecasted"),name="Data")
+p2h<- p2h + geom_ribbon(aes(ymin=lo95,ymax=hi95),alpha=.25)
+# p1a<-p1a+scale_x_datetime(name='',breaks=date_breaks('8 hours'),minor_breaks= date_breaks('1 hour'),labels=date_format("%Y-%m-%d %H"),expand=c(0,0))
+p2h<-p2h+scale_y_continuous(name='Fréquence')
+p2h <- p2h + labs(title='Frequence des camions - Exponential smoothing \n (Intervalle de confiance à 95%)')
+p2h<-p2h+theme(axis.text.x=element_text(size=10), plot.title = element_text(hjust = 0.5))
 
-dygraph(xts(x=pd_hw_es[,-c(1,5,6)], order.by = pd_hw_es[,1]), "Frequence des camions - Exponential Smoothing") %>%
-  dySeries("observed", label = "Real") %>%
-  dySeries("fitted", label = "Fitted") %>%
-  dySeries(c("lo95", "forecast", "hi95"), label = "Predicted") %>%
-  dyRangeSelector()
+p2h
+
+# dygraph(xts(x=pd_hw_es[,-c(1,5,6)], order.by = pd_hw_es[,1]), "Frequence des camions - Exponential Smoothing") %>%
+#   dySeries("observed", label = "Real") %>%
+#   dySeries("fitted", label = "Fitted") %>%
+#   dySeries(c("lo95", "forecast", "hi95"), label = "Predicted") %>%
+#   dyRangeSelector()
 
 ```
 </br>
@@ -749,7 +843,12 @@ Résultats de la sélection :
 ```{r "resultats stepwise", echo=FALSE}
 model_step <- readRDS("4_Scripts/4_Time series models/Models/lm_SIWIM_stepwise_model.rds")
 
-model_step$coefficients
+coef_df <- data.frame(Variables = names(model_step$coefficients), 
+                      Coefficients = model_step$coefficients)
+
+rownames(coef_df) <- NULL
+
+coef_df %>% kable()
 
 ```
 </br>
