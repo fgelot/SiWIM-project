@@ -22,7 +22,7 @@ library(questionr)# calcul Vcramer et des fréquences
 library(corrplot) # affichage matrice des correlations
 library(ggplot2)
 library(cowplot)  # grilles de graphiques
-library(reshape2) # plot des valeurs manquantes
+library(VIM) # plot des valeurs manquantes
 ```
 
 ```{r, message=FALSE, warning=FALSE, echo = FALSE}
@@ -118,9 +118,9 @@ siwim_data [, c("v","WGV", "W1","W2","W3","W4","W5","W6","W7","W8","W9","W10",
 
 # 1. Description des données
 
-Le jeu de données contient 54 variables et environ 184 000 lignes :
+Le jeu de données initial contient **54 variables** et environ **184 000 lignes** :
 
-Chaque ligne représente les valeurs des variables pour un camion capturé par le système de pesage par poids du Pont de Normandie.
+Chaque ligne représente les valeurs des variables pour un camion capturé par le système de pesage du Pont de Normandie.
 
 Il est important de rappeler que le système comporte sa propre fiabilité et est possiblement amené à capturer du bruit ou à dysfonctionner.
 
@@ -157,9 +157,11 @@ var_quali_graph$Jour_semaine <- factor(var_quali_graph$Jour_semaine,c("lundi","m
 var_graph <- cbind.data.frame(var_quali_graph,var_quanti_graph)
 ```
 
-## 2. Contexte de passage du camion (variables qualitatives)
+# 2. Contexte de passage du camion (variables qualitatives)
 
-Disposer ici quelques graphiques illustrant les données et montrant les valeurs manquantes
+
+Les variables qualitatives sont essentiellement lié au contexte du passage du camion (heure, voie de passage...)
+
 
 ```{r, message=FALSE, warning=FALSE, echo = FALSE}
 
@@ -212,7 +214,9 @@ En résumé :
 - 30 % des camions on déclenché une anomalie au niveau du système de pesage
 
 
-## 3. Descripteurs des camions (variables quantitatives)
+# 3. Descripteurs des camions (variables quantitatives)
+
+Les variables quantitatives essentiellement des descripteurs physiques de chaque camion.
 
 ```{r, message=FALSE, warning=FALSE, echo = FALSE}
 # Histogramme
@@ -279,11 +283,12 @@ Et une série de températures du sytème observée à -273 °C !
 # 4. Traitement des valeurs manquantes et aberrantes
 
 
-**Idée générale** : attribuer aux données aberrantes (dont nous sommes surs qu'elles soient fausses) un valeur "NA" puis reconstituer leur valeur grace aux techniques d'imputation du package `"missMDA"`.
+**Idée générale** : attribuer aux données aberrantes une valeur "NA" puis reconstituer leur valeur grace aux techniques d'imputation du package `"missMDA"`.
 
-Les seuils sont fixés à partir de la connaissance métier.
+**Les seuils sont fixés à partir de la connaissance métier**.
 
-Ainsi on considère comme valeure aberrante 
+Ainsi on considère comme valeure aberrante :
+
 - un nombre d'essieux supérieur à 8
 - une distance totale entre les axes > à 20 m
 - les températures négatives < à -10°C
@@ -315,44 +320,24 @@ siwim_data [, c("A8", "A9","A10","A11","A12","A13","A14","A15","M9","M10",
 
 Le remplacement des valeurs aberrantes par "NA" génère donc des valeurs manquantes :
 
-```{r, message=FALSE, warning=FALSE, echo = FALSE}
-# graphiques des valeurs manquantes
-
-# Fonction d'affichage
-ggplot_missing <- function(x){
-  
-  x %>% 
-    is.na %>%
-    melt %>%
-    ggplot(data = .,
-           aes(x = X2,
-               y = X1)) +
-    geom_raster(aes(fill = value)) +
-    scale_fill_grey(name = "",
-                    labels = c("Present","Missing")) +
-    theme_minimal() + 
-    theme(axis.text.x  = element_text(angle=45, vjust=0.5)) + 
-    labs(x = "Variables in Dataset",
-         y = "Rows / observations")
-}
-
-```
-
-```{r,message=FALSE, warning=FALSE, echo = FALSE, eval= FALSE}
+```{r,message=FALSE, warning=FALSE, echo = FALSE}
 # Graphique des valeurs manquantes
-ggplot_missing(siwim_data[,c("Lane", "Nb_axles","Annee","Mois_annee","Jour_semaine","Heure","Anomalie",
-                             "N","total_axle_dist","T","Reduced_chi_squared","Time_num","Vitesse","MGV")])
+
+val <- siwim_data[,c("Lane", "Nb_axles","Annee","Mois_annee",
+                    "Jour_semaine","Heure","Anomalie","N","total_axle_dist",
+                    "T","Reduced_chi_squared","Time_num","Vitesse","MGV")]
+
+aggr(val, col= c('cornflowerblue','pink'),
+                  numbers=TRUE,prop = FALSE, sortVars=TRUE,
+                  labels=names(val), cex.axis=.7,
+                  gap=3, ylab=c("Valeurs manquantes","Combinaisons"))
+
+
 
 ```
 
 
-```{r, message=FALSE, warning=FALSE, echo = FALSE}
-# bar plot de la proportion de valeurs manquantes par variables
-
-```
-
-L'imputation est réalisée par analyse factorielle des données multiples (FAMD) du package `Factominer`.
-Nous retenons l'information apportée par 7 axes factoriels :
+L'imputation est réalisée par analyse factorielle des données multiples (fonction `imputeFAMD`) du package `MissMDA`.
 
 ```{r, message=FALSE, warning=FALSE, echo = FALSE}
 # Jeu de donnée contenant seulement les variables utiles pour l'imputation
@@ -470,11 +455,13 @@ corrplot(cramer, method="number")
 Le V de Cramer offre une mesure absolue (valeur comprise de 0 à 1), de l'intensité de la liaison entre deux variables qualitatives.
 
 Liaison forte (V > 0.3) entre :
+
  - la classification réalisée par le système `SubClasss_ID` et le groupe d'essieux `Axle_Group` (V = 0.54)
  
  - la classification réalisée par le système `SubClasss_ID` et `Nb_axles` le nombre d'essieux
  
 Liaison totale (V = 1) entre :
+
 - `Warning_flags` et `Anomalie`(variable reconstruite signalant la présente d'un warning)
 - Le nombre d'essieux `Nb_axles` et le groupe d'essieux `Axle_Group`
 

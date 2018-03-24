@@ -12,7 +12,7 @@ output:
 knitr::opts_knit$set(root.dir = normalizePath("Z:/Data Science/R/SiWIM-project")) 
 ```
 
-# Introduction
+# 1. Introduction
 
 Nous poursuivons dans cette section notre analyse descriptive du jeu de données par une étude bi-dimensionnelle des variables qualitatives et quantitatives. 
 
@@ -81,69 +81,14 @@ siwim_imputed[, Heure := factor(Heure)]
 # Creation de deux jeux de données séparant variables quantitatives et qualitatives :
 varquanti <- siwim_imputed[, lapply(siwim_imputed, is.numeric) == TRUE, with = FALSE]
 varquali <- siwim_imputed[,lapply(siwim_imputed,is.numeric) == FALSE, with = FALSE]
-```
 
-# Analyse bidimensionnelle (étude des liaisons)
-
-
-### Etude des liaisons entre variables qualitatives (V de Cramer)
-
-```{r, message=FALSE, warning=FALSE, echo = FALSE}
 # On travaille avec un sous ensemble utiles des variables qualitatives
 varquali2 <- varquali[,.(Warning_flags,Subclass_ID,Axle_groups,Mois_annee,Jour_semaine,Heure,Lane,Nb_axles,Anomalie)]
 varquali2 <- as.data.frame(varquali2)
-```
 
-
-```{r, message=FALSE, warning=FALSE, echo = FALSE}
-# liaisons entre variables qualitatives (calcul du V de Cramer)
-cramer <- matrix(NA, ncol(varquali2), ncol(varquali2))
-for (i in (1:ncol(varquali2))){
-  for (j in (1:ncol(varquali2))){
-    cramer[i,j] <- cramer.v(table(varquali2[,i], varquali2[,j]))
-  }
-}
-
-colnames(cramer) <- colnames(varquali2)
-rownames(cramer) <- colnames(varquali2)
-
-corrplot(cramer, method="number")
-```
-
-Le V de Cramer offre une mesure absolue (valeur comprise de 0 à 1), de l'intensité de la liaison entre deux variables qualitatives.
-
-Liaison forte (V > 0.3) entre :
- - la classification réalisée par le système `SubClasss_ID` et le groupe d'essieux `Axle_Group` (V = 0.54)
- 
- - la classification réalisée par le système `SubClasss_ID` et `Nb_axles` le nombre d'essieux
- 
-Liaison totale (V = 1) entre :
-- `Warning_flags` et `Anomalie`(variable reconstruite signalant la présente d'un warning)
-- Le nombre d'essieux `Nb_axles` et le groupe d'essieux `Axle_Group`
-
-
-### Etude des liaisons entre variables quantitatives (corrélation de Pearson)
-
-
-```{r, message=FALSE, warning=FALSE, echo = FALSE}
 # On travaille avec un sous ensemble utiles des variables quantitatives
 varquanti2 <- varquanti[,c("N", "total_axle_dist","T","Reduced_chi_squared","Time_num","Vitesse","MGV")]
-```
 
-Nous calculons le coefficient de corrélation linéaire de Pearson entre les variables quantitatives :
-
-```{r, message=FALSE, warning=FALSE, echo = FALSE}
-# Matrice de correlation (Pearson) 
-corr <- cor(varquanti2)
-corrplot(corr, method="number")
-```
-
-De nombreuses relations linéaires entre les grandeurs physiques (masse, longueur, vitesse,...)
-
-
-### Etude des liaisons entre variables quantitatives
-
-```{r, message=FALSE, warning=FALSE, echo = FALSE}
 # Jeu de donnée final
 siwim_final <-cbind(varquali2,varquanti2)
 
@@ -152,7 +97,7 @@ setDT(siwim_final)
 ```
 
 
-# Analyse Factorielles
+# 2. Analyse Factorielles
 
 Les analyses factorielles permettent de résumer l'information contenues dans nos données.
 
@@ -163,7 +108,7 @@ Nous souhaitons avoir les réponses aux questions suivantes :
 * Quelles sont les relations entre les variables ?
 * Quelles sont les relations entres les modalités et les variables quantitatives ?
 
-## Analyse Factorielle des Donnees Mixtes (AFDM)
+## 2.1 Analyse Factorielle des Donnees Mixtes (AFDM)
 
 ```{r, message=FALSE, warning=FALSE, echo = FALSE}
 # Calcul de l'AFDM
@@ -193,7 +138,7 @@ Les variables quantitatives sont essentiellement des descripteurs des camions.
 Nous proposons donc d'appliquer une Analyse en Composantes Principales sur les données quantitatives avec les **variables qualitatives en illustration**. Ces variables qualitatives ne participeront pas à la construction des axes, mais en faciliteront leur description.
 
 
-## Analyse en Composantes Principales (ACP)
+## 2.2 Analyse en Composantes Principales (ACP)
 
 ```{r, message=FALSE, warning=FALSE, echo = FALSE}
 # Preparation du jeu de donnee
@@ -206,7 +151,7 @@ res_PCA <-PCA(don_PCA, scale.unit = TRUE, graph = FALSE,ncp = Inf, quali.sup = 8
 ```
 
 
-### Variance / Inertie Expliquee
+### 2.2.1 Variance / Inertie Expliquee
 
 Etudions la variance (inertie) expliquée par les axes de l'analyse factorielle :
 
@@ -227,7 +172,7 @@ Pour la suite, nous conserverons les 4 premiers axes capturant 89 % de la variab
 Le premier plan factoriel, présente l'intérêt d'être facilement interprétable (dimension 2) et de résumer 61 % de l'information. Les représentations graphiques qui suivront concerneront ce plan.
 
 
-### Graphiques des individus
+### 2.2.2 Graphiques des individus
 
 
 ```{r, message=FALSE, warning=FALSE, echo = FALSE}
@@ -266,7 +211,7 @@ La majorité des 100 contributeurs les plus fort à la construction des axes a d
 Ceci parait potentiellement cohérent avec les éventuelles valeurs fortes que prendraient ces camions par rapport à certaines valeurs physiques (surpoids).
 
 
-### Graphique des variables
+### 2.2.3 Graphique des variables
 
 ```{r, message=FALSE, warning=FALSE, echo = FALSE}
 # Cercle des correlations coloré en fonction de la qualité de représentation 
@@ -289,7 +234,7 @@ Sur l'axe 2, `T` et `Time_Num` sont très bien représentées.
 
 
 
-### Contributions des variables aux axes principaux
+### 2.2.4 Contributions des variables aux axes principaux
 
 ```{r, message=FALSE, warning=FALSE, echo = FALSE}
 # Contributions des variables à composante 1
@@ -308,7 +253,7 @@ plot_grid(p_contrib1,p_contrib2, ncol = 2, nrow = 1)
 
 
 
-# Clustering (apprentissage non supervisé)
+# 3. Clustering (apprentissage non supervisé)
 
 Nous avons vu précédemment que suite à l'ACP, les 4 premières composantes principales expliquaient 89 % de la variabilité.
 Nous réduisons donc notre nuage de point en effectuant une nouvelle ACP en ne conservant que les 4 premières variables.
@@ -324,11 +269,11 @@ don_PCA_clusters <- data.frame(res_PCA2$ind$coord)
 ```
 
 
-## Méthode hiérarchique
+## 3.1 Méthode hiérarchique
 
 Les méthodes hiérarchiques présentent l'intérêt de proposer un nombre optimal de cluster, dont le découpage est réalisé en optimisant un critère. 
 
-###  kmeans + CAH sur composantes principales
+###  3.1.1 kmeans + CAH sur composantes principales
 
 Problème : 
 Notre jeu de données contient environ 190 000 individus, ce qui nous expose à des problèmes calculatoires et de mémoires
