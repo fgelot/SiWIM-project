@@ -2,12 +2,13 @@
 title: "Suite de l'analyse descriptive du jeu de données SIWIM"
 output: 
   html_document:
+    theme : united
     df_print: paged
 ---
 
 ```{r "setup", include=FALSE}
 # Configuration locale du chemin du projet SIWIM :
-knitr::opts_knit$set(root.dir = normalizePath("Z:/Data Science/R/SiWIM-project")) 
+knitr::opts_knit$set(root.dir = normalizePath("D:/Dropbox/Data science/Formation CEPE/Projet/GitHub/SiWIM-project")) 
 ```
 
 # Introduction
