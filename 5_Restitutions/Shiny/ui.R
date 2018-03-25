@@ -147,7 +147,10 @@ shinyUI(dashboardPage(
                 # ligne horizontale
                 hr(), width = 8),
               box(#Dygraph des données
-                dygraphOutput("graph_data_train"), width = 12)
+                dygraphOutput("graph_data_train"), width = 12),
+              box(# importance des variables
+                plotOutput("graph_var_imp")
+                )
             )),
     
     # Fourth tab content

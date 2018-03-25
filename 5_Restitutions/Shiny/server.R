@@ -159,6 +159,39 @@ shinyServer(function(input, output, session) {
     }
   })
   
+  
+  imp_var <- reactive({
+    if (input$idDataTrainGroup == 1) {
+      if(input$idModelTrainData == 1){
+        imp_simple
+      }else if(input$idModelTrainData == 2){
+        imp_simple_int
+      }else if(input$idModelTrainData == 3){
+        imp_lags
+      }else if(input$idModelTrainData == 4){
+        imp_reg
+      }else if(input$idModelTrainData == 5){
+        imp_rf
+      }else{
+        imp_gbm
+      }
+    } else{
+      if(input$idModelTrainData == 1){
+        imp_simple_full
+      }else if(input$idModelTrainData == 2){
+        imp_simple_int_full
+      }else if(input$idModelTrainData == 3){
+        imp_lags_full
+      }else if(input$idModelTrainData == 4){
+        imp_reg_full
+      }else if(input$idModelTrainData == 5){
+        imp_rf_full
+      }else{
+        imp_gbm_full
+      }
+    }
+  })
+  
   SIWIM_data_train <- reactive({
     if (input$idDataTrainGroup == 1) {
       siwim_data_hours[169:nrow(siwim_data_hours), c("Date",
@@ -238,10 +271,19 @@ shinyServer(function(input, output, session) {
       return()
     
     isolate({
-      print(head(results_train_set()))
+      print(dim(results_train_set()))
+      print(dim(SIWIM_data_train()))
+      print(input$idModelTrainData)
     })
   })
   
+  ## Importance des variables 
+  
+  output$graph_var_imp <- renderPlot(
+    print(plot_importance(imp_var(), 
+                    rownames(results_train_set())[as.integer(input$idModelTrainData)])
+          )
+  )
   
   ## GRaph des prédictions sur train data
   output$graph_data_train <- renderDygraph({

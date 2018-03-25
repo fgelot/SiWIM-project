@@ -1,6 +1,9 @@
 #### Sourcing prepare data before testing models
 
 # library(data.table)
+# library(forecast)
+# library(caret)
+# library(gbm)
 # setwd("D:/Dropbox/Data science/Formation CEPE/Projet/New_GitHub/SiWIM-project")
 # source("4_Scripts/4_Time series models/Time series SIWIM before models.R")
 
@@ -149,10 +152,18 @@ results_train_full <-
   )
 
 
-get_importance <- function(model, scale = F){
+ get_importance <- function(model, scale = T){
 
-  importance <- varImp(model, scale = scale)
-  imp_df <- importance$importance
+  if(model$method == "gbm"){
+    importance <- relative.influence(model$finalModel, 
+                                     n.trees = model$finalModel$n.trees,
+                                     sort. = TRUE,
+                                     scale. = scale)
+    imp_df = data.frame(Overall = importance)
+  }else{
+    importance <- varImp(model, scale = scale)
+    imp_df <- importance$importance
+  }
   imp_df$vars <- rownames(imp_df)
   rownames(imp_df) <- NULL
   
@@ -167,12 +178,16 @@ imp_simple_int <- get_importance(lm_simple_int_SIWIM_model)
 imp_lags <- get_importance(lm_SIWIM_model)
 imp_reg <- get_importance(reg_SIWIM_model)
 imp_rf <- get_importance(rf_SIWIM_model)
+imp_gbm <- get_importance(gbm_SIWIM_model)
+
+imp_gbm
 
 imp_simple_full <- get_importance(lm_simple_full_SIWIM_model)
 imp_simple_int_full <- get_importance(lm_simple_int_full_SIWIM_model)
 imp_lags_full <- get_importance(lm_full_SIWIM_model)
 imp_reg_full <- get_importance(reg_full_SIWIM_model)
 imp_rf_full <- get_importance(rf_full_SIWIM_model)
+imp_gbm_full <- get_importance(gbm_full_SIWIM_model)
 
 plot_importance <- function(imp, model_type){
   d <- ggplot(imp, aes(x=reorder(vars,Overall),y=Overall),size=2)
@@ -189,6 +204,7 @@ plot_importance <- function(imp, model_type){
 # plot_importance(imp_lags, "Linear with lags")
 # plot_importance(imp_reg, "Regularized")
 # plot_importance(imp_rf, "Random forest")
+# plot_importance(imp_gbm, "Gradient Boosting")
 # 
 # 
 # plot_importance(imp_simple_full, "Simple linear")
@@ -196,3 +212,7 @@ plot_importance <- function(imp, model_type){
 # plot_importance(imp_lags_full, "Linear with lags")
 # plot_importance(imp_reg_full, "Regularized")
 # plot_importance(imp_rf_full, "Random forest")
+# plot_importance(imp_gbm_full, "Gradient Boosting")
+
+# rownames(results_train)[6]
+

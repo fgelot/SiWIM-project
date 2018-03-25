@@ -7,6 +7,8 @@ library(DT)
 library(xts)
 library(data.table)
 library(forecast)
+library(caret)
+library(gbm)
 
 ## UI
 library(shinythemes)
