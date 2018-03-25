@@ -849,7 +849,7 @@ lmfit <- lm(Count ~., data = siwim_data_hours_X)
 model_step <- step(lmfit, direction = "both", k = log(nrow(siwim_data_hours_X)))
 ```
 
-Résultats de la sélection :
+Résultats de la sélection (critère BIC) :
 
 ```{r "resultats stepwise", echo=FALSE}
 model_step <- readRDS("4_Scripts/4_Time series models/Models/lm_SIWIM_stepwise_model.rds")
@@ -877,10 +877,18 @@ Les séries temporelles sont des observations ordonnées chronologiquement. Ains
 
 ## 4.5 Modèles entrainés avec validation croisée
 
-+ Regression linéaire simple
-+ Regression linéaire simple avec interactions
-+ Regression linéaire simple avec lags 
-+ Régression pénalisée (ridge/lasso)
-+ Random forest
-+ Gradient boosting
+* Regression linéaire simple : Heure et Jour_semaine
+* Regression linéaire simple avec interactions : Heure et Jour_semaine
+* Regression linéaire simple avec lags : Heure et Jour_semaine (sans interactions) avec lags choisis par selection stepwise (BIC)
+* Régression pénalisée (ridge/lasso/elasticnet)
+    + $$ \lambda : 1,10,50,100,200,500,1000 $$
+* Random forest
+    + Nombre de variabes choisies aléatoirement à chaque split (mtry) : $$ 1, \sqrt(p)$$
+    + Nombre d'arbres : 500
+* Gradient boosting
+    + Nombre d'interactions (n.trees) : 100, 500, 1000, 1500
+    + nombre de noeuds terminaux des arbres plus 1 (interaction.depth) : 1, 5, 9
+    + paramètre de régularisation ($\lambda$) : 0.1
+    + Nombre minimum d'individus dans chaque feuille : 20
+
 

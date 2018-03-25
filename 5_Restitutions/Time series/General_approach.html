@@ -154,19 +154,19 @@ $(document).ready(function () {
 </thead>
 <tbody>
 <tr class="odd">
-<td align="left">2017-10-17 12:00:00</td>
+<td align="left">2017-10-22 03:00:00</td>
 </tr>
 <tr class="even">
-<td align="left">2017-10-11 04:00:00</td>
+<td align="left">2017-10-10 08:00:00</td>
 </tr>
 <tr class="odd">
-<td align="left">2017-10-08 14:00:00</td>
+<td align="left">2017-08-27 03:00:00</td>
 </tr>
 <tr class="even">
-<td align="left">2017-10-11 08:00:00</td>
+<td align="left">2017-09-15 12:00:00</td>
 </tr>
 <tr class="odd">
-<td align="left">2017-08-26 22:00:00</td>
+<td align="left">2017-09-18 11:00:00</td>
 </tr>
 </tbody>
 </table>
@@ -204,7 +204,15 @@ $(document).ready(function () {
 </div>
 <div id="arima-auto-regressive-integrated-moving-average" class="section level2">
 <h2>3.3 ARIMA : Auto-regressive integrated moving average</h2>
-<p>Number of AR (Auto-Regressive) terms (p): AR terms are just lags of dependent variable. For instance if p is 5, the predictors for x(t) will be x(t-1)..x(t-5). Number of MA (Moving Average) terms (q): MA terms are lagged forecast errors in prediction equation. For instance if q is 5, the predictors for x(t) will be e(t-1)..e(t-5) where e(i) is the difference between the moving average at ith instant and actual value. Number of Differences (d): These are the number of nonseasonal differences, i.e. in this case we took the first order difference. So either we can pass that variable and put d=0 or pass the original variable and put d=1. Both will generate same results.</p>
+<p>Un modèle ARIMA cherche à prédire la valeur d’une série temporelle en fonction de ses valeurs précédentes (<span class="math inline">\(y_t = f(y_{t-1}, y_{t-2}, …)\)</span>).</p>
+<p>Les processus autorégressifs supposent que chaque point peut être prédit par la somme pondérée d’un ensemble de points précédents, plus un terme aléatoire d’erreur.</p>
+<p>Le processus d’intégration suppose que chaque point présente une différence constante avec le point précédent.</p>
+<p>Les processus de moyenne mobile supposent que chaque point est fonction des erreurs entachant les points précédant, plus sa propre erreur. Un modèle ARIMA est étiqueté comme modèle ARIMA (p,d,q), dans lequel : + p est le nombre de termes auto-régressifs + d est le nombre de différences + q est le nombre de moyennes mobiles.</p>
+<p>La différentiation d’une série est nécessaire pour éliminer toute tendance et atteindre la stationnarité. Dans notre cas, la série est dèjà stationnaire (test de Dickey-Fuller). L’ordre d de différenciation (I integrated en anglais) sera systématiquement à 0.</p>
+<p>Les modèles auto-régressifs supposent que yt est une fonction linéaire des valeurs précédentes.</p>
+<p><span class="math inline">\(y_t = \mu + \Phi_1 y_{t-1} + \Phi_2 y_{t-2} + \Phi_3 y_{t-3} + \epsilon_t\)</span></p>
+<p>Les modèles à moyenne mobile suggèrent que la série présente des fluctuations autour d’une valeur moyenne. On considère alors que la meilleure estimation est représentée par la moyenne pondérée d’un certain nombre de valeurs antérieures (ce qui est le principe des procédures de moyennes mobiles utilisées pour le lissage des données). Ceci revient en fait à considérer que l’estimation est égal à la moyenne vraie, auquel on ajoute une somme pondérée des erreurs ayant entaché les valeurs précédentes :</p>
+<p><span class="math inline">\(y_t = \mu - \theta_1 \epsilon_{t-1} - \theta_2 \epsilon_{t-2} - \theta_3 \epsilon_{t-3} + \epsilon_t\)</span></p>
 <p>q - The lag value where the ACF chart crosses the upper confidence interval for the first time p - The lag value where the PACF chart crosses the upper confidence interval for the first time.</p>
 <p><span class="math inline">\(p = 1\)</span> and <span class="math inline">\(q = 8\)</span></p>
 <div id="arima-autoregressif-dordre-1" class="section level3">
@@ -412,7 +420,7 @@ $(document).ready(function () {
 </div>
 <div id="selection-de-variables-de-lags-par-stepwise-pour-les-regressions" class="section level2">
 <h2>4.3 Sélection de variables de lags par stepwise pour les regressions</h2>
-<p>Résultats de la sélection :</p>
+<p>Résultats de la sélection (critère BIC) :</p>
 <table>
 <thead>
 <tr class="header">
@@ -631,12 +639,25 @@ $(document).ready(function () {
 <div id="modeles-entraines-avec-validation-croisee" class="section level2">
 <h2>4.5 Modèles entrainés avec validation croisée</h2>
 <ul>
-<li>Regression linéaire simple</li>
-<li>Regression linéaire simple avec interactions</li>
-<li>Regression linéaire simple avec lags</li>
-<li>Régression pénalisée (ridge/lasso)</li>
-<li>Random forest</li>
-<li>Gradient boosting</li>
+<li>Regression linéaire simple : <span class="math inline">\(Heure et Jour_semaine\)</span></li>
+<li>Regression linéaire simple avec interactions : <span class="math inline">\(Heure et Jour_semaine\)</span></li>
+<li>Regression linéaire simple avec lags : <span class="math inline">\(Heure et Jour_semaine (sans interactions) avec lags choisis par selection stepwise (BIC)\)</span></li>
+<li>Régression pénalisée (ridge/lasso/elasticnet)
+<ul>
+<li>$ : 1,10,50,100,200,500,1000 $</li>
+</ul></li>
+<li>Random forest
+<ul>
+<li>Nombre de variabes choisies aléatoirement à chaque split (mtry) : $ 1, (p)$</li>
+<li>Nombre d’arbres : 500</li>
+</ul></li>
+<li>Gradient boosting
+<ul>
+<li>Nombre d’interactions (n.trees) : 100, 500, 1000, 1500</li>
+<li>nombre de noeuds terminaux des arbres plus 1 (interaction.depth) : 1, 5, 9</li>
+<li>paramètre de régularisation (<span class="math inline">\(\lambda\)</span>) : 0.1</li>
+<li>Nombre minimum d’individus dans chaque feuille : 20</li>
+</ul></li>
 </ul>
 </div>
 </div>

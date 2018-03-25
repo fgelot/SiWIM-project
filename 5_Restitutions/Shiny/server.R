@@ -15,6 +15,18 @@ shinyServer(function(input, output, session) {
       includeHTML("5_Restitutions/Shiny/html/explic.html")
     })
   
+  output$data_desc <-
+    renderUI({
+      includeHTML("5_Restitutions/Shiny/html/1_Description_Donnees_Gestion_Donnees_Manquantes.html")
+    })
+  
+  
+  output$ACP_clust <-
+    renderUI({
+      includeHTML("5_Restitutions/Shiny/html/2_ACP_Clustering.html")
+    })
+  
+  
   output$approachHTML <-
     renderUI({
       includeHTML("5_Restitutions/Shiny/html/General_approach.html")

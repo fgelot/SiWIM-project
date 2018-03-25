@@ -15,7 +15,7 @@ shinyUI(dashboardPage(
   dashboardHeader(title = "Projet SIWIM"),
   ## Sidebar content
   dashboardSidebar(
-    width = 250,
+    width = 350,
     sidebarMenu(
       menuItem(
         "Introduction système SIWIM",
@@ -26,15 +26,15 @@ shinyUI(dashboardPage(
       menuSubItem("Web scraping",
                   tabName = "Web_scrap"),
       menuItem(
-        "Analyse des données",
+        "Données et gestion des valeurs manquantes",
         tabName = "Data_analysis",
         icon = icon("truck"),
         startExpanded = TRUE
       ),
-      menuSubItem("Description des données",
-                  tabName = "Data_desc"),
-      menuSubItem("Valeurs manqauntes",
-                  tabName = "NA_values"),
+      # menuSubItem("Description des données",
+      #             tabName = "Data_desc"),
+      # menuSubItem("Valeurs manqauntes",
+      #             tabName = "NA_values"),
       menuItem(
         "ACP et Clustering",
         tabName = "ACP_Clustering",
@@ -65,6 +65,10 @@ shinyUI(dashboardPage(
   dashboardBody(tabItems(
     tabItem(tabName = "Introduction",
             htmlOutput("introHTML")),
+    tabItem(tabName = "Data_analysis",
+            htmlOutput("data_desc")),
+    tabItem(tabName = "ACP_Clustering",
+            htmlOutput("ACP_clust")),
     # First tab content
     tabItem(tabName = "Time_series",
             fluidRow(
