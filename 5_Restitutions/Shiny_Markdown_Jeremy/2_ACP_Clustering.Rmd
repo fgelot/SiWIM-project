@@ -462,7 +462,7 @@ plot_grid(p1,p2,p3,p4, ncol = 2, nrow = 2)
 ```
 
 
-Nous choisissons de conserver la partition en **trois groupes réalisés via Kmeans** sur les 4 premiers axes de l'analyse en composantes principales. Le critère de choix est essentiellement lié à l'interprétation des classes.
+Nous choisissons de conserver la partition en **trois groupes réalisée via Kmeans** sur les 4 premiers axes de l'analyse en composantes principales. Le critère de choix est essentiellement lié à l'interprétation des classes.
 
 **Le groupe 1** comprend des camions ayant une longueur, un nombre d'essieux, une masse nettement inférieure à la moyenne, dont la vitesse est en moyenne supérieure. **Ce groupe comprend notamment les véhicules utilitaires légers (VUL)** notamment caractérisés par leurs deux essieux.
 
