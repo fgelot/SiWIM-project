@@ -1,0 +1,463 @@
+---
+title: "Suite de l'analyse descriptive du jeu de données SIWIM"
+output: 
+  html_document:
+    theme: "united"
+    fig_width: 10
+    df_print: paged
+---
+
+```{r "setup", include=FALSE}
+# Configuration locale du chemin du projet SIWIM :
+knitr::opts_knit$set(root.dir = normalizePath("Z:/Data Science/R/SiWIM-project")) 
+```
+
+# 1. Introduction
+
+Nous poursuivons dans cette section notre analyse descriptive du jeu de données par une étude bi-dimensionnelle des variables qualitatives et quantitatives. 
+
+Enfin, nous utiliserons des techniques d'analyses multidimensionnelles : les analyses factorielles et le clustering non supervisé afin de poursuivre l'exploration de notre jeu de données.
+
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# chargement des librairies 
+
+library(data.table)
+library(questionr)   # calcul Vcramer et des fréquences
+library(ggplot2)
+library(ggpubr)      # mise a jour de graphiques ggplot
+library(cowplot)     # grilles de graphiques
+library(corrplot)    # affichage matrice des correlations
+library(FactoMineR)  # analyses factorielles
+library(factoextra)  # beaux graphiques pour analyses factorielles et clustering
+library(fastcluster) # clustering CAH rapide
+library(cluster)     # clustering CLARA
+library(dbscan)      # clustering DBSCAN
+
+```
+
+Nous choisissons de poursuivre nos analyses sur la base du jeu de données dont les données manquantes ont été imputées :
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+
+# Chargement
+siwim_imputed <- read.csv("2_Data/2_Retraitees/SiWIM_data_after_input.csv")
+
+# Transformation en data table
+setDT(siwim_imputed)
+
+```
+
+
+```{r,message=FALSE, warning=FALSE, echo = FALSE}
+# Conversions post-import des données
+
+# Conversion en factor de Subclass_ID
+siwim_imputed[, Subclass_ID := factor(as.character(Subclass_ID))]
+
+# Conversion en factor de la variable Axle_groups
+siwim_imputed[, Axle_groups := factor(as.character(Axle_groups))]
+
+# Conversion en factor de la variable Nb_Axles (nombre d'axes)
+siwim_imputed[, Nb_axles := as.factor(as.character(Nb_axles))]
+
+# Conversion en factor de la variable Annee
+siwim_imputed[, Annee := factor(as.character(Annee))]
+
+# Conversion en factor de la variable Mois_num
+siwim_imputed[, Mois_num := factor(as.character(Mois_num))]
+
+# Conversion en factor de la variable Jour_num
+siwim_imputed[, Jour_num := factor(as.character(Jour_num))]
+
+# Conversion en factor de la variable Heure
+siwim_imputed[, Heure := factor(Heure)]
+
+```
+
+
+```{r,message=FALSE, warning=FALSE, echo = FALSE}
+
+# Creation de deux jeux de données séparant variables quantitatives et qualitatives :
+varquanti <- siwim_imputed[, lapply(siwim_imputed, is.numeric) == TRUE, with = FALSE]
+varquali <- siwim_imputed[,lapply(siwim_imputed,is.numeric) == FALSE, with = FALSE]
+
+# On travaille avec un sous ensemble utiles des variables qualitatives
+varquali2 <- varquali[,.(Warning_flags,Subclass_ID,Axle_groups,Mois_annee,Jour_semaine,Heure,Lane,Nb_axles,Anomalie)]
+varquali2 <- as.data.frame(varquali2)
+
+# On travaille avec un sous ensemble utiles des variables quantitatives
+varquanti2 <- varquanti[,c("N", "total_axle_dist","T","Reduced_chi_squared","Time_num","Vitesse","MGV")]
+
+# Jeu de donnée final
+siwim_final <-cbind(varquali2,varquanti2)
+
+# Transformation en data table
+setDT(siwim_final)
+```
+
+
+# 2. Analyse Factorielles
+
+Les analyses factorielles permettent de résumer l'information contenues dans nos données.
+
+Nous souhaitons avoir les réponses aux questions suivantes :
+
+* Quels sont les camions qui se ressemblent (proximité entre les individus) ?
+* Sur quelles caractéristiques sont fondées les ressemblances / dissemblances ?
+* Quelles sont les relations entre les variables ?
+* Quelles sont les relations entres les modalités et les variables quantitatives ?
+
+## 2.1 Analyse Factorielle des Donnees Mixtes (AFDM)
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# Calcul de l'AFDM
+res_FAMD <-FAMD(siwim_final[,-c(1:3)], graph = FALSE,ncp = 20)
+```
+
+Etudions la variance (inertie) expliquée par les axes de l'analyse factorielle :
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# Graphique des éboulis (méthode du coude)
+fviz_eig(res_FAMD, addlabels = TRUE, ylim = c(0, 10)) + labs(title = "Variance expliquée par les axes factoriels (AFMD)", x = "Axes Factoriels", y = "% de variance expliquée")
+```
+
+13 % de l'inertie totale expliquée par le premier plan factoriel.
+30 % de l'inertie totale expliquée par les 10 premiers axes.
+
+ **Cela est relativement faible**.
+
+Constat :
+* insuffisant pour une réduction de dimension à utiliser en entrée d'un traitement ultérieur. 
+Garder un grand nombre d'axes nous feraient travailler avec trop de données.
+* Le but recherché est de trouver une représentation synthétique des donnée, afin de notamment   caractériser des groupes de camions par clustering s'appuyant sur cette représentation.
+
+Les variables qualitatives sont essentiellement des variables de contexte (heure, jour, mois de passage, ainsi que la variable `Anomalie` déclenchée par le système de pesage.)
+Les variables quantitatives sont essentiellement des descripteurs des camions.
+
+Nous proposons donc d'appliquer une Analyse en Composantes Principales sur les données quantitatives avec les **variables qualitatives en illustration**. Ces variables qualitatives ne participeront pas à la construction des axes, mais en faciliteront leur description.
+
+
+## 2.2 Analyse en Composantes Principales (ACP)
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# Preparation du jeu de donnee
+don_PCA <- cbind.data.frame(varquanti2,varquali2[,c("Mois_annee","Jour_semaine","Heure","Lane","Anomalie")])
+```
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# Calcul de l'ACP avec variables qualitatives supplementaires
+res_PCA <-PCA(don_PCA, scale.unit = TRUE, graph = FALSE,ncp = Inf, quali.sup = 8:12)
+```
+
+
+### 2.2.1 Variance / Inertie Expliquee
+
+Etudions la variance (inertie) expliquée par les axes de l'analyse factorielle :
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# Graphique des éboulis (méthode du coude)
+fviz_eig(res_PCA, addlabels = TRUE, ylim = c(0, 50)) + labs(title = "Variance expliquée par les axes factoriels (ACP)", x = "Axes Factoriels", y = "% de variance expliquée")
+```
+
+- 100 % de l'information est contenue dans les 7 variables quantitatives
+- 89% de l'information résumée par les 4 premières composantes principales
+- 61 % par le premier plan factoriel
+
+Pour la suite, nous conserverons les 4 premiers axes capturant 89 % de la variabilité
+
+- Nous travaillerons ainsi avec moins de données
+- La variabilité des trois axes non retenus est assimilée à du bruit
+
+Le premier plan factoriel, présente l'intérêt d'être facilement interprétable (dimension 2) et de résumer 61 % de l'information. Les représentations graphiques qui suivront concerneront ce plan.
+
+
+### 2.2.2 Graphiques des individus
+
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# Graphique des individus
+p <- fviz_pca_ind(res_PCA)
+fviz_add(p,res_PCA$quali.sup$coord,color = "red") + labs(title = "Nuage des individus (camions) - ACP")
+```
+
+- Trop d'individus affichés, groupes invisibles à l'oeil nu
+- Detection d'individu se détachant par leur valeur (exemple : **95521**) : s'agit-il d'un outlier ou d'un parangon (représentant de sa classe) ?
+- le nuage des modalités des variables qualitatives se "concentre" au centre du plan => pas de corrélation notable entre ces modalités et les variables qui décrivent les axes factoriels
+
+Nous allons analyser visuellement la qualité de représentation des individus (cos2) :
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# Graphique des 100 individus les plus contributeurs suivant leur qualite de representation
+p<- fviz_pca_ind(res_PCA, col.ind = "cos2", select.ind = list(contrib= 100)) + 
+               labs(title ="100 individus les plus contributeurs à la construction du 1er plan factoriel (ACP)")
+fviz_add(p,res_PCA$quali.sup$coord,color = "red")
+```
+
+
+Représentation des 100 individus ayant le plus contribué à la construction des deux axes du plan factoriel principal, en colorant suivant la qualité de la représentation du poin.
+
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# Graphique des 100 individus les plus contributeurs avec coloration suivant la modalité de la variable Anomalie
+p <- fviz_pca_ind(res_PCA, select.ind = list(contrib= 100), habillage = siwim_final$Anomalie) +
+  labs(title ="100 individus les plus contributeurs à la construction du 1er plan factoriel (ACP)")
+p <- fviz_add(p,res_PCA$quali.sup$coord,color = "red")
+ggpar(p,legend.title = "Anomalie")
+```
+
+La majorité des 100 contributeurs les plus fort à la construction des axes a déclenchée une anomalie (1 camion sur trois sur le jeu de donnée entier)
+
+Ceci parait potentiellement cohérent avec les éventuelles valeurs fortes que prendraient ces camions par rapport à certaines valeurs physiques (surpoids).
+
+
+### 2.2.3 Graphique des variables
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# Cercle des correlations coloré en fonction de la qualité de représentation 
+fviz_pca_var(res_PCA, col.var = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE # Évite le chevauchement de texte
+             ) + labs(title ="Cercle des corrélations entre variables (ACP)")
+```
+
+
+Ce graphique montre les relations entre les variables qui sont regroupées quand elles sont corrélées. 
+
+**Le premier axe oppose les camions les plus volumineux (car nombre d'essieux importants, masse importante, et longueur importante) au camion les plus petits, les moins lourds et qui sont les plus rapides.**
+
+**Le deuxième axe montre que la température `T` est corrélée négativement à la variable `Time_Num` qui est la variable de temps (continue).**
+
+la qualité de représentation (le cos2) est très bonne pour `N`et `total_axle_dist` et `MGV`. 
+`Vitesse` n'a pas une représentation excellente
+Sur l'axe 2, `T` et `Time_Num` sont très bien représentées.
+
+
+
+### 2.2.4 Contributions des variables aux axes principaux
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# Contributions des variables à composante 1
+p_contrib1 <- fviz_contrib(res_PCA, choice = "var", axes = 1) + labs(title = "Contribution des variables au 1er axe")
+```
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# Contributions des variables à composante 2
+p_contrib2 <- fviz_contrib(res_PCA, choice = "var", axes = 2) + labs(title = "Contribution des variables au 2e axe")
+```
+
+
+```{r}
+plot_grid(p_contrib1,p_contrib2, ncol = 2, nrow = 1)
+```
+
+
+
+# 3. Clustering (apprentissage non supervisé)
+
+Nous avons vu précédemment que suite à l'ACP, les 4 premières composantes principales expliquaient 89 % de la variabilité.
+Nous réduisons donc notre nuage de point en effectuant une nouvelle ACP en ne conservant que les 4 premières variables.
+
+Chaque algorithme de clustering sera exécuté sur ce nouvel ensemble.
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# On réalise un prétraitement par ACP normée en gardant 4 dimensions
+res_PCA2 <- PCA(varquanti2, scale.unit = TRUE, graph = FALSE,ncp = 4)
+
+# On stocke les 4 premieres composantes principales dans un data frame
+don_PCA_clusters <- data.frame(res_PCA2$ind$coord)
+```
+
+
+## 3.1 Méthode hiérarchique
+
+Les méthodes hiérarchiques présentent l'intérêt de proposer un nombre optimal de cluster, dont le découpage est réalisé en optimisant un critère. 
+
+###  3.1.1 kmeans + CAH sur composantes principales
+
+Problème : 
+Notre jeu de données contient environ 190 000 individus, ce qui nous expose à des problèmes calculatoires et de mémoires
+
+Solution envisagée :
+Partitionnement Kmeans sur un grand nombre de classe, en amont de la CAH
+
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# Kmeans sur un nombre grand nombre de clusters
+set.seed(123)
+res_kmeans_grand <- kmeans(don_PCA_clusters[,c("Dim.1","Dim.2","Dim.3","Dim.4")],centers=1000,iter=100)
+```
+
+On effectue ensuite une CAH sur les centres des classes :
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+
+# Calcul de la matrice de distance (euclidienne)
+dist <- dist(res_kmeans_grand$centers,method="euclidean")
+
+# Classification Ascendante Hierarchique (methode de Ward)
+cah <- fastcluster::hclust(dist,method="ward.D")
+
+# Affichage dendrogramme
+plot(as.dendrogram(cah),main="Ward")
+rect.hclust(cah,k=3)
+
+```
+
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# Recherche du nombre de classe
+plot(sort(cah$height,decreasing=TRUE),xlim=c(0,35),type="h",ylab="Hauteur",main="Ward")
+lines(sort(cah$height,decreasing=TRUE),xlim=c(0,35))
+abline(v=3, lty=2, col='red')
+
+```
+
+Un niveau de coupure à 3 ou 4 classes semble être envisageable.
+Nous décidons de couper à 3 classes.
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# On décide du niveau de coupure
+classes_centres <- cutree(cah,k=3)
+
+# Nous rajoutons la variable de classe au jeu de données contenant les axes factoriels
+don_PCA_clusters$clusters_cah_mixte <- as.factor(classes_centres[res_kmeans_grand$cluster])
+```
+
+Représentons sur le premier axe factoriels, les individus colorés en fonction de leur groupe déterminés par la CAH mixte.
+
+```{r,  message=FALSE, warning=FALSE, echo = FALSE}
+# Affichage sur le premier plan principal des individus en fonction de leur groupes
+p1 <- ggplot(don_PCA_clusters, aes(x=Dim.1, y=Dim.2, color=clusters_cah_mixte)) + geom_point() +
+    labs(title ="Représentation des camions sur le premier plan factoriel")
+p1
+```
+
+
+## Partitionnement : K-means sur composantes principales
+
+Kmeans seul
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# kmeans sur 3 groupes
+set.seed(123)
+res_kmeans <- kmeans(don_PCA_clusters[,c("Dim.1","Dim.2","Dim.3","Dim.4")],centers=3,iter=500)
+
+# Nous rajoutons la variable de classe au jeu de données contenant les axes factoriels
+don_PCA_clusters$clusters_kmeans <- as.factor(res_kmeans$cluster)
+```
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# Affichage sur le premier plan principal des individus en fonction de leur groupes
+p2 <- ggplot(don_PCA_clusters, aes(x=Dim.1, y=Dim.2, color=clusters_kmeans)) + geom_point() +
+    labs(title ="Représentation des camions sur le premier plan factoriel")
+p2
+```
+
+ 
+## Partitionnement k - medoides : CLARA sur composantes principales
+
+Un medoïde est le représentant le plus central d'une classe.
+L'algorithme des k-medoïdes réalise un partitionnement plus robuste vis à vis des données aberrantes, que celui des k-means.
+
+Il s'agit d'un extension aux méthodes k-medoides pour traiter de grands jeux de données (plusieurs milliers d'observations). Elle est donc adaptée à notre contexte :
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# On applique la méthode CLARA sur 3 groupes
+set.seed(123)
+res_clara <- clara(don_PCA_clusters[,c("Dim.1","Dim.2","Dim.3","Dim.4")],k = 3)
+
+# Nous rajoutons la variable de classe au jeu de données contenant les axes factoriels
+don_PCA_clusters$clusters_clara <- as.factor(res_clara$clustering)
+
+```
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# Affichage sur le premier plan principal des individus en fonction de leur groupes
+p3 <- ggplot(don_PCA_clusters, aes(x=Dim.1, y=Dim.2, color=clusters_clara)) + geom_point() +
+    labs(title ="Représentation des camions sur le premier plan factoriel")
+p3
+```
+
+## Partitionnement basé sur densité : DBSCAN sur composantes principales
+
+DBSCAN est un algorithme de partitionnement de type "densité". Il s'appuie sur la densité des données pour réaliser le partitionnement. 
+L'algorithme utilise deux parametres : la distance epsilon et le nombre de points minimum devant se trouver dans un rayon epsilon pour considerer ces points comme un cluster.
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# Determination de la valeur epsilon optimale, k = nombre de dimension + 1
+dbscan::kNNdistplot(don_PCA_clusters[,c("Dim.1","Dim.2","Dim.3","Dim.4")], k =  5)
+abline(h=0.75, col = "red", lty=2)
+
+```
+
+Nous executons ensuite DBSCAN avec les paramètres eps et minPts de l'heuristique précédente.
+
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# DBSCAN
+set.seed(123)
+res_dbscan <- dbscan::dbscan(don_PCA_clusters[,c("Dim.1","Dim.2","Dim.3","Dim.4")], eps = 0.75, minPts = 5)
+
+# Nous rajoutons la variable de classe au jeu de données contenant les axes factoriels
+don_PCA_clusters$clusters_dbscan <- as.factor(res_dbscan$cluster)
+```
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+# Affichage sur le premier plan principal des individus en fonction de leur groupes
+p4 <- ggplot(don_PCA_clusters, aes(x=Dim.1, y=Dim.2, color=clusters_dbscan)) + geom_point() +
+    labs(title ="Représentation des camions sur le premier plan factoriel")
+p4
+```
+
+L'algorithme propose ici 7 clusters.
+
+# Autres méthodes (non testées)
+
+## Partitionnement k - medoides : PAM
+
+PAM (Partitioning Around Medoid) est une implémentation populaire mais nécessite de calculer les distances entre chaque individus pris deux à deux et pénalise ainsi la scalabilité que nous rencontrons dans notre cas.
+
+
+## Partitionnement basé sur densité : OPTICS
+
+Cet algorithme est similaire à DBSCAN et élimine son principal défaut : l'impossibilité de détecter des partitions de densités différentes.
+
+
+##  Méthodes neuronales : cartes auto-adaptatives de Kohonen (SOM)
+
+Les cartes de Kohonen forment une classe de neurones artificiels, formant une méthode d'apprentissage non supervisé.
+L'algorithme est très léger en temps de calcul, permet de détecter des relations non linéaires mais présente l'inconvénient que les relations entre neurones ne peuvent être cassées pour une meilleure représentation des données.
+L'algorithme "Growing Neural Gas" corrige ce problème.
+
+## Synthèse et interprétation des classes
+
+Nous interpretons les classes construites dans chaque méthode. L'idée est de dégager une interprétation commune, favorisant l'utilité métier. 
+
+
+```{r,message=FALSE, warning=FALSE, echo = FALSE}
+# Rajout des classes dans le jeu de variables quanti (pour l'interprétation) et d'analyse final
+varquanti_clusters <- cbind.data.frame(varquanti2,don_PCA_clusters[,c("clusters_cah_mixte","clusters_kmeans","clusters_clara","clusters_dbscan")])
+siwim_final2 <- cbind.data.frame(siwim_final,don_PCA_clusters[,c("clusters_cah_mixte","clusters_kmeans","clusters_clara")])
+
+```
+
+L'interprétation des classes est réalisée en comparant la moyenne de chaque variable quantitatives de chaque classe, à la moyenne de la population globale de cette même variable
+
+
+```{r,message=FALSE, warning=FALSE, echo=FALSE}
+p1 <- p1 + labs(title ="CAH mixte")
+p2 <- p2 + labs(title ="Kmeans")
+p3 <- p3 + labs(title ="CLARA")
+p4 <- p4 + labs(title = "DBSCAN")
+plot_grid(p1,p2,p3,p4, ncol = 2, nrow = 2)
+```
+
+
+Nous choisissons de conserver la partition en trois groupes réalisés via Kmeans sur les 4 premiers axes de l'analyse en composantes principales. Le critère de choix est essentiellement lié à l'interprétation des classes.
+
+**Le groupe 1** comprend des camions ayant une longueur, un nombre d'essieux, une masse nettement inférieure à la moyenne, dont la vitesse est en moyenne supérieure. **Ce groupe comprend notamment les véhicules utilitaires légers (VUL)** notamment caractérisés par leurs deux essieux.
+
+**Le groupe 2** correspond à des véhicules comportant un nombre d'essieux, une longueur, et une masse supérieures à la moyenne. La Masse est nettement plus importante, ce groupe caractérise les véhicules les plus lourds et les plus lents comme en attestent leur masse et leur vitesse moyenne.
+
+**Le groupe 3** est un groupe intermédiaire : il comporte des camions plus lourds que la moyenne mais en moyenne deux fois moins lourds que ceux du groupe 2. Leur vitesse est la plus importante, supérieure à la moyenne et aux petits véhicules. Ce sont des camions assez grands et comportant un nombre d'essieux supérieur à la moyenne.
