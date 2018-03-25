@@ -7,9 +7,11 @@ output:
     df_print: paged
 ---
 
-```{r "setup", include=FALSE, message=FALSE, warning=FALSE, echo = FALSE}
+```{r "setup", include=FALSE, message=FALSE, warning=FALSE, echo = FALSE, error=FALSE}
+
 # Configuration locale du chemin du projet SIWIM :
 knitr::opts_knit$set(root.dir = normalizePath("Z:/Data Science/R/SiWIM-project"))
+
 ```
 
 ```{r, message=FALSE, warning=FALSE, echo = FALSE}
@@ -283,7 +285,7 @@ Et une série de températures du sytème observée à -273 °C !
 # 4. Traitement des valeurs manquantes et aberrantes
 
 
-**Idée générale** : attribuer aux données aberrantes une valeur "NA" puis reconstituer leur valeur grace aux techniques d'imputation du package `"missMDA"`.
+**Idée générale** : attribuer aux données aberrantes une valeur **NA** puis reconstituer leur valeur grace aux techniques d'imputation du package `"missMDA"`.
 
 **Les seuils sont fixés à partir de la connaissance métier**.
 
@@ -318,7 +320,7 @@ siwim_data [, c("A8", "A9","A10","A11","A12","A13","A14","A15","M9","M10",
                 "M11","M12","M13","M14","M15","M16") := NULL]
 ```
 
-Le remplacement des valeurs aberrantes par "NA" génère donc des valeurs manquantes :
+Le remplacement des valeurs aberrantes par **NA** génère donc des valeurs manquantes :
 
 ```{r,message=FALSE, warning=FALSE, echo = FALSE}
 # Graphique des valeurs manquantes
@@ -366,7 +368,7 @@ siwim_data_inputted_final[MGV < 0, MGV := 0.5]
 siwim_data_inputted_final[MGV > 70, MGV := 70]
 ```
 
-## Comparaison graphique post-imputation
+## Graphiques post-imputation
 
 ```{r, message=FALSE, warning=FALSE, echo = FALSE}
 
@@ -421,10 +423,9 @@ plot_grid(p1bis,p2bis,p3bis,p4bis,p5bis,p6bis, ncol = 2, nrow = 3)
 ```
 
 
-L'imputation semble donner de bons résultats. Etant basée sur une méthode d'estimation, les valeurs imputées peuvent de nouveaux franchir les limites fixées.
-Nous pouvons soit les supprimer, soit imputer aux valeurs limites de manière à conserver la donnée et donc le plus d'information possible.
+L'imputation semble donner de bons résultats. 
 
-La deuxième approche consiste à éliminer les individus ayant des valeurs manquantes et / ou aberrantes.
+Une autre approche aurait consisté à éliminer les individus ayant des valeurs manquantes et / ou aberrantes (non choisi ici).
 
 # 5. Analyse bidimensionnelle (étude des liaisons)
 

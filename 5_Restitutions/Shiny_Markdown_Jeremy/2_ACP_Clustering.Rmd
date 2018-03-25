@@ -14,9 +14,9 @@ knitr::opts_knit$set(root.dir = normalizePath("Z:/Data Science/R/SiWIM-project")
 
 # 1. Introduction
 
-Nous poursuivons dans cette section notre analyse descriptive du jeu de données par une étude bi-dimensionnelle des variables qualitatives et quantitatives. 
+Nous poursuivons dans cette section notre analyse descriptive du jeu de données par l'utilisation des techniques d'analyses multidimensionnelles.
 
-Enfin, nous utiliserons des techniques d'analyses multidimensionnelles : les analyses factorielles et le clustering non supervisé afin de poursuivre l'exploration de notre jeu de données.
+Nous appliquons dans cette section des algorithmes d' **analyses factorielles** et de **clustering non supervisé**.
 
 
 ```{r, message=FALSE, warning=FALSE, echo = FALSE}
@@ -36,7 +36,7 @@ library(dbscan)      # clustering DBSCAN
 
 ```
 
-Nous choisissons de poursuivre nos analyses sur la base du jeu de données dont les données manquantes ont été imputées :
+Nous choisissons de poursuivre nos analyses sur la base du jeu de données dont les données manquantes ont été imputées.
 
 ```{r, message=FALSE, warning=FALSE, echo = FALSE}
 
@@ -122,14 +122,16 @@ Etudions la variance (inertie) expliquée par les axes de l'analyse factorielle 
 fviz_eig(res_FAMD, addlabels = TRUE, ylim = c(0, 10)) + labs(title = "Variance expliquée par les axes factoriels (AFMD)", x = "Axes Factoriels", y = "% de variance expliquée")
 ```
 
-13 % de l'inertie totale expliquée par le premier plan factoriel.
-30 % de l'inertie totale expliquée par les 10 premiers axes.
+**13 %** de l'inertie totale expliquée par le **premier plan factoriel**.
+
+**30 %** de l'inertie totale expliquée par les **10 premiers axes**.
 
  **Cela est relativement faible**.
 
 Constat :
+
 * insuffisant pour une réduction de dimension à utiliser en entrée d'un traitement ultérieur. 
-Garder un grand nombre d'axes nous feraient travailler avec trop de données.
+Garder un grand nombre d'axes nous ferait travailler avec trop de données.
 * Le but recherché est de trouver une représentation synthétique des donnée, afin de notamment   caractériser des groupes de camions par clustering s'appuyant sur cette représentation.
 
 Les variables qualitatives sont essentiellement des variables de contexte (heure, jour, mois de passage, ainsi que la variable `Anomalie` déclenchée par le système de pesage.)
@@ -164,7 +166,7 @@ fviz_eig(res_PCA, addlabels = TRUE, ylim = c(0, 50)) + labs(title = "Variance ex
 - 89% de l'information résumée par les 4 premières composantes principales
 - 61 % par le premier plan factoriel
 
-Pour la suite, nous conserverons les 4 premiers axes capturant 89 % de la variabilité
+Pour la suite, **nous conserverons les 4 premiers axes capturant 89 % de la variabilité :**
 
 - Nous travaillerons ainsi avec moins de données
 - La variabilité des trois axes non retenus est assimilée à du bruit
@@ -247,7 +249,7 @@ p_contrib2 <- fviz_contrib(res_PCA, choice = "var", axes = 2) + labs(title = "Co
 ```
 
 
-```{r}
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
 plot_grid(p_contrib1,p_contrib2, ncol = 2, nrow = 1)
 ```
 
@@ -258,7 +260,7 @@ plot_grid(p_contrib1,p_contrib2, ncol = 2, nrow = 1)
 Nous avons vu précédemment que suite à l'ACP, les 4 premières composantes principales expliquaient 89 % de la variabilité.
 Nous réduisons donc notre nuage de point en effectuant une nouvelle ACP en ne conservant que les 4 premières variables.
 
-Chaque algorithme de clustering sera exécuté sur ce nouvel ensemble.
+Chaque algorithme de clustering sera exécuté sur ce nouvel ensemble. **Le but est de construire une typologie des camions circulant sur le pont**.
 
 ```{r, message=FALSE, warning=FALSE, echo = FALSE}
 # On réalise un prétraitement par ACP normée en gardant 4 dimensions
@@ -269,17 +271,18 @@ don_PCA_clusters <- data.frame(res_PCA2$ind$coord)
 ```
 
 
-## 3.1 Méthode hiérarchique
+## 3.1 kmeans + CAH sur composantes principales (méthode hierarchique)
 
-Les méthodes hiérarchiques présentent l'intérêt de proposer un nombre optimal de cluster, dont le découpage est réalisé en optimisant un critère. 
-
-###  3.1.1 kmeans + CAH sur composantes principales
+Les méthodes hiérarchiques présentent l'intérêt de proposer un nombre optimal de cluster, dont le découpage est réalisé en optimisant un critère.
 
 Problème : 
-Notre jeu de données contient environ 190 000 individus, ce qui nous expose à des problèmes calculatoires et de mémoires
+Notre jeu de données contient environ 190 000 individus, **ce qui nous expose à des problèmes calculatoires et de mémoire.**
 
 Solution envisagée :
-Partitionnement Kmeans sur un grand nombre de classe, en amont de la CAH
+Utilisation d'une méthode mixte en deux étapes :
+
+- partitionnant du jeu de données avec Kmeans sur un grand nombre de classes
+- réalisation d'une Classification Ascendante Hiérarchique sur le centre des classes
 
 
 ```{r, message=FALSE, warning=FALSE, echo = FALSE}
@@ -334,9 +337,9 @@ p1
 ```
 
 
-## Partitionnement : K-means sur composantes principales
+## 3.2 Partitionnement : K-means sur composantes principales
 
-Kmeans seul
+Ici, seule la méthode kmeans est utilisée. Le nombre de classes fixé à 3, est celui trouvé précédemment avec la CAH.
 
 ```{r, message=FALSE, warning=FALSE, echo = FALSE}
 # kmeans sur 3 groupes
@@ -355,12 +358,14 @@ p2
 ```
 
  
-## Partitionnement k - medoides : CLARA sur composantes principales
+## 3.3 Partitionnement k - medoides : CLARA sur composantes principales
+
+CLARA est l'acronyme de Clustering Large Application.
 
 Un medoïde est le représentant le plus central d'une classe.
 L'algorithme des k-medoïdes réalise un partitionnement plus robuste vis à vis des données aberrantes, que celui des k-means.
 
-Il s'agit d'un extension aux méthodes k-medoides pour traiter de grands jeux de données (plusieurs milliers d'observations). Elle est donc adaptée à notre contexte :
+Il s'agit d'un extension aux méthodes k-medoides pour **traiter de grands jeux de données** (plusieurs milliers d'observations). Elle est donc adaptée à notre contexte :
 
 ```{r, message=FALSE, warning=FALSE, echo = FALSE}
 # On applique la méthode CLARA sur 3 groupes
@@ -379,9 +384,11 @@ p3 <- ggplot(don_PCA_clusters, aes(x=Dim.1, y=Dim.2, color=clusters_clara)) + ge
 p3
 ```
 
-## Partitionnement basé sur densité : DBSCAN sur composantes principales
+## 3.4 Partitionnement basé sur densité : DBSCAN sur composantes principales
 
-DBSCAN est un algorithme de partitionnement de type "densité". Il s'appuie sur la densité des données pour réaliser le partitionnement. 
+DBSCAN est un algorithme de partitionnement de type "densité". 
+Il s'appuie sur la densité des données pour réaliser le partitionnement. 
+
 L'algorithme utilise deux parametres : la distance epsilon et le nombre de points minimum devant se trouver dans un rayon epsilon pour considerer ces points comme un cluster.
 
 ```{r, message=FALSE, warning=FALSE, echo = FALSE}
@@ -410,29 +417,30 @@ p4 <- ggplot(don_PCA_clusters, aes(x=Dim.1, y=Dim.2, color=clusters_dbscan)) + g
 p4
 ```
 
-L'algorithme propose ici 7 clusters.
+L'algorithme propose ici **7 clusters**.
 
-# Autres méthodes (non testées)
+## 3.5 Autres méthodes (non testées)
 
-## Partitionnement k - medoides : PAM
+Nous listons ici des méthodes non testées, mais revetant un intéret dans la poursuite de l'exploration de nos données.
+
+### 3.5.1 Partitionnement k - medoides : PAM
 
 PAM (Partitioning Around Medoid) est une implémentation populaire mais nécessite de calculer les distances entre chaque individus pris deux à deux et pénalise ainsi la scalabilité que nous rencontrons dans notre cas.
 
-
-## Partitionnement basé sur densité : OPTICS
+### 3.5.2 Partitionnement basé sur densité : OPTICS
 
 Cet algorithme est similaire à DBSCAN et élimine son principal défaut : l'impossibilité de détecter des partitions de densités différentes.
 
 
-##  Méthodes neuronales : cartes auto-adaptatives de Kohonen (SOM)
+### 3.5.3  Méthodes neuronales : cartes auto-adaptatives de Kohonen (SOM)
 
 Les cartes de Kohonen forment une classe de neurones artificiels, formant une méthode d'apprentissage non supervisé.
 L'algorithme est très léger en temps de calcul, permet de détecter des relations non linéaires mais présente l'inconvénient que les relations entre neurones ne peuvent être cassées pour une meilleure représentation des données.
 L'algorithme "Growing Neural Gas" corrige ce problème.
 
-## Synthèse et interprétation des classes
+## 3.6 Synthèse et interprétation des classes
 
-Nous interpretons les classes construites dans chaque méthode. L'idée est de dégager une interprétation commune, favorisant l'utilité métier. 
+Nous interprétons les classes construites dans chaque méthode. L'idée est de dégager une interprétation commune, favorisant l'utilité métier. 
 
 
 ```{r,message=FALSE, warning=FALSE, echo = FALSE}
@@ -442,7 +450,7 @@ siwim_final2 <- cbind.data.frame(siwim_final,don_PCA_clusters[,c("clusters_cah_m
 
 ```
 
-L'interprétation des classes est réalisée en comparant la moyenne de chaque variable quantitatives de chaque classe, à la moyenne de la population globale de cette même variable
+L'interprétation des classes est réalisée en comparant la moyenne de chaque variable quantitatives de chaque classe, à la moyenne de la population globale de cette même variable.
 
 
 ```{r,message=FALSE, warning=FALSE, echo=FALSE}
@@ -454,7 +462,7 @@ plot_grid(p1,p2,p3,p4, ncol = 2, nrow = 2)
 ```
 
 
-Nous choisissons de conserver la partition en trois groupes réalisés via Kmeans sur les 4 premiers axes de l'analyse en composantes principales. Le critère de choix est essentiellement lié à l'interprétation des classes.
+Nous choisissons de conserver la partition en **trois groupes réalisés via Kmeans** sur les 4 premiers axes de l'analyse en composantes principales. Le critère de choix est essentiellement lié à l'interprétation des classes.
 
 **Le groupe 1** comprend des camions ayant une longueur, un nombre d'essieux, une masse nettement inférieure à la moyenne, dont la vitesse est en moyenne supérieure. **Ce groupe comprend notamment les véhicules utilitaires légers (VUL)** notamment caractérisés par leurs deux essieux.
 
