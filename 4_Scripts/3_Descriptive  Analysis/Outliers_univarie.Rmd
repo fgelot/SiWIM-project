@@ -1,0 +1,136 @@
+---
+title: "Données aberrantes avec approche univariée"
+output: 
+  html_document:
+    theme: united
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+# Configuration locale du chemin du projet SIWIM :
+knitr::opts_knit$set(root.dir = normalizePath("C:/Users/schmidt/Documents/GitHub/SiWIM-project/")) 
+options(encoding = 'UTF-8')
+```
+
+Les valeurs aberrantes peuvent survenir pour diverses raisons, dont la plus évidente est lors d’erreurs de mesure, erreurs de transcription des données, etc.
+
+Cependant, les valeurs aberrantes ne sont pas forcément erronées.  Parfois, elles sont des valeurs qui révèlent un phénomène particulier qui peut être différent du modèle suivi par la majorité des observations.
+
+```{r}
+# install.packages("data.table")
+# install.packages("dplyr")
+# install.packages("caret",
+#                  repos = "http://cran.r-project.org", 
+#                  dependencies = TRUE)
+# install.packages("ggplot2")
+# install.packages("rmarkdown")
+
+library(data.table)
+library(caret)
+library(ggplot2)
+library(dplyr)
+library(rmarkdown)
+
+don <- read.csv('2_Data/2_Retraitees/SiWIM_data_after_input_clusters.csv',header=T)
+dim(don)
+
+names(don)
+```
+
+# Méthodologie
+
+Les variables en notre possession sont: 
++ Des paramètres physiques du véhicule: poids total, poids sur essieux, distances entre essieux, 
++ Des variables d'environnement: date et heure de passage, température, 
++ Des variables liées au passage du véhicule: vitesse, voie de passage, 
++ Des variables liées au traitement mathématique et numérique du problème inverse: la mesure du chi2 entre mesure et calcul, différents "warnings" tags quant aux traitements réalisés.
+
+Nous allons utiliser une approche univariée puis une approche multivariée pour déterminer les outliers. 
+
+L'approche univariée, comme son nom l'indique, recherche les outliers par rapport à une seule variable. Une observation qui est inconditionnelle non usuelle est appelée "univariate outlier", donnée aberrante univariée.  
+
+L'approche multivariée passe par la recherche d'un modèle entre les variables en présence. Les outliers sont alors déterminés avec différentes distances (Cook, residual, r-strudent, les hatvalues, Mahalanobis, DFFITS), voir (Outlier detection in multivariate data, K. Senthamarai, K. Manoj, Applied Mathematical Sciences, 2015). 
+Une donnée aberrante multivariée est une donnée qui a une valeur non usuelle de la variable $Y$, conditionnellement à la valeur de la/des variable(s) $X$ ($X_i$).
+
+A noter qu'il existe différents packages qui permettent de traiter le problème des outliers (car, outlierD, ...), mais nous avons poréféré ici passer par la recherche de modèles. 
+
+
+# Approche univariée
+
+Tout d'abord nous créons le dataframe correspondant où les variables manquantes (typiquement les poids des essieux non existants) sont ramenées à 0: 
+
+```{r}
+don <- don[,c("Warning_flags","A1","A2","A3","A4","A5","A6","A7",
+                      "M1","M2","M3","M4","M5","M6","M7","M8","N", 
+                      "Reduced_chi_squared", "Vitesse", "MGV", "clusters_kmeans")]
+
+dim(don)
+
+names(don)
+
+don[is.na(don)] <- 0
+```
+
+Un outlier est un individu dont la variable étudiée est en dehors de 1.5*IQR, avec IQR (Inter Quartile Range) est la différence entre le 75\ieme et 25\ieme quantile. 
+
+Cette recherche de outliers peut se faire en univariée à l'aide de bowplot. 
+
+Les sorties de la fonction boxplot sont: 
++ stats: vecteur de longueur 5, qui contient la valeur extrême de la moustache inférieure, la charnière inférieure, la médiane, la charbnière supérieure et la valeur extrême de la moustache supérieure. 
++ n: le nombre d'observations NA dans l'échantillon.	
++ conf: les valeurs inférieures et supérieures du ‘notch’ (if(do.conf)). 
++ out : les valeurs des points en dehors des extrêmes des moustaches. 
+
+Ici nous effectuons ce test pour différentes variables puis créons une colonne supplémentaire dans nos données qui identifie l'individu comme un outlier ("TRUE") ou pas("FALSE). 
+
+## Pour le poids total en charge
+
+```{r}
+outlier_values <- boxplot.stats(don$MGV)$out
+boxplot(don$MGV, main="Poids total", boxwex=0.1)
+length(outlier_values) # 142 outliers
+
+check_outlier <- function(v, coef=1.5){
+  quantiles <- quantile(v,probs=c(0.25,0.75))
+  IQR <- quantiles[2]-quantiles[1]
+  res <- v < (quantiles[1]-coef*IQR)|v > (quantiles[2]+coef*IQR)
+  return(res)
+}
+
+don$outlier <- check_outlier(don$MGV)
+
+# write.csv(don, file = "../../2_Data/2_Retraitees/SiWIM_data_after_input_clusters_outliers.csv")
+```
+
+```{r}
+ggplot(don,aes(x=MGV,y=Reduced_chi_squared, colour=outlier))+
+  geom_boxplot()+
+  geom_text(aes(label=Warning_flags),hjust=-0.3)
+```
+
+```{r}
+ggplot(don,aes(x=outlier,y=Reduced_chi_squared, colour=Warning_flags))+
+   geom_boxplot()
+```
+
+```{r}
+ggplot(don, aes(y=Warning_flags, x=Reduced_chi_squared, group=outlier)) +
+  geom_point(aes(shape=outlier, color=outlier))
+```
+
+## Pour le poids sur essieu 2
+
+```{r}
+don$outlier <- check_outlier(don$M2)
+ggplot(don, aes(y=Warning_flags, x=Reduced_chi_squared, group=outlier)) +
+  geom_point(aes(shape=outlier, color=outlier))
+```
+
+## Pour la vitesse
+
+```{r}
+don$outlier <- check_outlier(don$Vitesse)
+ggplot(don, aes(y=Warning_flags, x=Reduced_chi_squared, group=outlier)) +
+  geom_point(aes(shape=outlier, color=outlier))
+```
+

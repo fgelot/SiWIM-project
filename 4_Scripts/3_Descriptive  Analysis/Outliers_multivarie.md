@@ -1,0 +1,252 @@
+---
+title: "Outliers avec approche multivariée"
+output: 
+  html_document:
+    theme: united
+    df_print: paged
+    toc: yes
+---
+
+
+```{r setup, include=FALSE}
+# Configuration locale du chemin du projet SIWIM :
+knitr::opts_knit$set(root.dir = normalizePath("C:/Users/schmidt/Documents/GitHub/SiWIM-project/")) 
+options(encoding = 'UTF-8')
+```
+
+```{r}
+library(data.table)
+library(caret)
+library(ggplot2)
+library(dplyr)
+library(rmarkdown)
+
+don <- read.csv('2_Data/2_Retraitees/SiWIM_data_after_input_clusters.csv',header=T)
+dim(don)
+
+names(don)
+don[is.na(don)] <- 0
+don <- don[,c("Warning_flags","A1","A2","A3","A4","A5","A6","A7",
+                      "M1","M2","M3","M4","M5","M6","M7","M8","N", 
+                      "Reduced_chi_squared", "Vitesse", "MGV", "clusters_kmeans")]
+```
+
+
+# Approche multivariée
+
+Pour l'approche multivariée: 
++ On cherche un modèle représentant les données, 
++ puis avec ce modèle on définit les outliers comme les individus ayant une distance de Cook supérieure à 4 fois la distance de Cook moyenne. 
+
+La valeur 4 n'est pas une valeur fixe ou définitive. 
+
+De plus, d'autres approches peuvent être mises en place, par exemple avec les résidues, les hat values et les valeurs de r-student. 
+
+## Recherche du modèle avec caret
+
+```{r}
+ptm <- proc.time()
+
+train <- don[1:1000,c("A1","A2","A3","A4","A5","A6","A7",
+                 "M1","M2","M3","M4","M5","M6","M7","M8","N", 
+                 "Vitesse", "MGV", "Reduced_chi_squared")]
+
+str(train)
+
+sum(is.na(train))
+```
+
+```{r}
+preProcValues <- caret::preProcess(train, method = c("knnImpute","center","scale"))
+sum(is.na(train))
+
+
+library('RANN')
+train_processed <- predict(preProcValues, train)
+sum(is.na(train_processed))
+
+str(train_processed)
+```
+
+L'échantillon de données est coupé en deux, pour la pouplation d'apprentissage (75%) et celle de test (25%). 
+Cela est fait facilement avec la fonction createDataPartition du package caret.
+
+```{r}
+index <- createDataPartition(train_processed$MGV, p=0.75, list=FALSE)
+trainSet <- train_processed[ index,]
+testSet <- train_processed[-index,]
+
+str(trainSet)
+```
+
+On utilise la fonction rfe pour contrôler les features (ici validation croisée, avec 3 répétitions). 
+
+De plus, le calage de modèle est aussi contrôlée par validation croisée, avec 5 répétitions.
+
+```{r}
+control <- rfeControl(functions = rfFuncs,
+                      method = "repeatedcv",
+                      repeats = 3,
+                      verbose = FALSE)
+outcomeName<-'MGV'
+predictors<-names(trainSet)[!names(trainSet) %in% outcomeName]
+MGV_Pred_Profile <- rfe(trainSet[,predictors], trainSet[,outcomeName],
+                         rfeControl = control)
+MGV_Pred_Profile
+
+names(getModelInfo())
+
+fitControl <- trainControl(
+  method = "repeatedcv",
+  number = 5,
+  repeats = 5)
+```
+
+Les modèles recherchés sont le modèle linéaire généralisé, celui avec pénalisation Lasso, les forêts aléatoires, et les gradient boosting. 
+
+## Modèle linéaire généralisé
+
+```{r}
+model_glm<-train(trainSet[,predictors],trainSet[,outcomeName],method='gbm',trControl=fitControl,tuneLength=10)
+print(model_glm)
+plot(model_glm)
+```
+
+## Modèle linéaire généralisé avec pénalisation Lasso
+
+```{r}
+model_rqlasso<-train(trainSet[,predictors],trainSet[,outcomeName],method='rqlasso',
+                     ,trControl=fitControl,tuneLength=10)
+print(model_rqlasso)
+plot(model_rqlasso)
+```
+
+## Forêts aléatoires
+
+```{r}
+model_rf<-train(trainSet[,predictors],trainSet[,outcomeName],method='rf',
+                ,trControl=fitControl,tuneLength=10) # random Forest
+print(model_rf)
+plot(model_rf)
+```
+
+## Gradient boosting
+
+```{r}
+model_gbm<-train(trainSet[,predictors],trainSet[,outcomeName],method='gbm',
+                 ,trControl=fitControl,tuneLength=10) #Stochastic Gradient Boosting
+print(model_gbm)
+plot(model_gbm)
+```
+
+## Comparaison des différents modèles
+
+```{r}
+results <- resamples(list(mod.glm=model_glm, 
+                          mod.rqlasso=model_rqlasso, 
+                          mod.rf=model_rf,
+                          mod.rf=model_rf, mod.gbm=model_gbm))
+results$values
+summary(results)
+bwplot(results)
+bwplot(results)
+dotplot(results)
+
+CPU_time <- proc.time() - ptm
+print(CPU_time)
+```
+
+## Recherche des outliers
+
+Nous recherchons le modèle linéaire généralisé avec toutes les données, et en utilisant la fonction glm de R base. 
+
+```{r}
+names(don)
+model_glm_glm <- glm(MGV~., data=don, family="gaussian")
+```
+
+### Avec les résidus
+
+Une règle approximative consiste à dire que les données aberrantes sont les individus avec un résidus standardisés supérieurs à 3.3 (correspondant à un niveau de $\alpha$ de .001).
+
+```{r}
+resid_glm <- tail(resid(model_glm_glm),n=1000)
+
+plot(resid_glm, pch="*", cex=2, 
+     main="Observations influentes, avec les résidus") 
+
+influential <- as.numeric(names(resid_glm)) # Lignes influentes
+head(don[influential, ])
+
+don$outlier <- "FALSE"
+don[influential,"outlier"] <- "TRUE"
+
+ggplot(don, aes(y=Warning_flags, x=Reduced_chi_squared, group=outlier)) +
+  geom_point(aes(shape=outlier, color=outlier))
+```
+
+###Avec la distance de Cook 
+
+La distance de Cook est essentiellement une mesure de distance standardisée qui permet de décrire le changement dans l’estimateur de $\beta$ lorsque l’on retire l’observation $i$.
+Une grande valeur de la distance de Cook suggère que l’observation i possède une grande influence.
+
+```{r}
+cooksd <- cooks.distance(model_glm_glm)
+
+plot(cooksd, pch="*", cex=2, 
+     main="Observations influentes, avec la distance de Cook") 
+abline(h = 4*mean(cooksd, na.rm=T), col="red")  
+text(x=1:length(cooksd)+1, y=cooksd, 
+     labels=ifelse(cooksd>4*mean(cooksd, na.rm=T),names(cooksd),""), 
+     col="red") 
+
+influential <- names(cooksd[(cooksd > 4*mean(cooksd, na.rm=T))]) # Lignes influentes
+influential <- influential[!is.na(influential)]
+head(don[influential, ])
+
+don$outlier <- "FALSE"
+don[influential,"outlier"] <- "TRUE"
+
+ggplot(don, aes(y=Warning_flags, x=Reduced_chi_squared, group=outlier)) +
+  geom_point(aes(shape=outlier, color=outlier))
+```
+
+### Avec les hat values
+
+La statistique de leverage (leverage points = points influents), $h$, aussi appelée hat value (issue de la hat matrice, aussi appelée matrice de projection), identfie les individus qui influencent plus la line de régression que les autres.
+
+```{r}
+hat_values <- tail(hatvalues(model_glm_glm),n=1000)
+
+plot(hat_values, pch="*", cex=2, 
+     main="Observations influentes, avec les hat values") 
+
+influential <- as.numeric(names(hat_values)) # Lignes influentes
+head(don[influential, ])
+
+don$outlier <- "FALSE"
+don[influential,"outlier"] <- "TRUE"
+
+ggplot(don, aes(y=Warning_flags, x=Reduced_chi_squared, group=outlier)) +
+  geom_point(aes(shape=outlier, color=outlier))
+```
+
+### Avec les résidus de r-student
+
+Un résidu studentisé est le résidu observé divisé par l'écart-type. 
+
+```{r}
+r_stud <- tail(rstudent(model_glm_glm),n=1000)
+
+plot(r_stud, pch="*", cex=2, 
+     main="Observations influentes, avec les résidus") 
+
+influential <- as.numeric(names(r_stud)) # Lignes influentes
+head(don[influential, ])
+
+don$outlier <- "FALSE"
+don[influential,"outlier"] <- "TRUE"
+
+ggplot(don, aes(y=Warning_flags, x=Reduced_chi_squared, group=outlier)) +
+  geom_point(aes(shape=outlier, color=outlier))
+```
