@@ -431,4 +431,22 @@ shinyServer(function(input, output, session) {
       )
   })
   
+  ## Anomalies
+  
+  output$univarie <-
+    renderUI({
+      includeHTML("5_Restitutions/Shiny/html/Outliers_univarie.html")
+    })
+  
+  
+  output$multivarie <-
+    renderUI({
+      includeHTML("5_Restitutions/Shiny/html/Outliers_multivarie.html")
+    })
+  
+  output$pacakge_car <-
+    renderUI({
+      includeHTML("5_Restitutions/Shiny/html/Outliers_car.html")
+    })
+  
 })

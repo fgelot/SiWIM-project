@@ -58,7 +58,13 @@ shinyUI(dashboardPage(
         tabName = "Anomalies",
         icon = icon("truck"),
         startExpanded = TRUE
-      )
+      ),
+      menuSubItem("Anomalies avec approche univariée",
+                  tabName = "univarie"),
+      menuSubItem("Anomalies avec approche multivariée",
+                  tabName = "multivarie"),
+      menuSubItem("Anomalies avec package car",
+                  tabName = "package_car")
     )
   ),
   
@@ -202,6 +208,14 @@ shinyUI(dashboardPage(
               box(#Dygraph des données
                 dygraphOutput("graph_data_test"), width = 12)
             )
-            )
+            ), 
+    # tabItem(tabName = "Anomalies",
+    #         ),
+    tabItem(tabName = "univarie",
+            htmlOutput("univarie")),
+    tabItem(tabName = "multivarie",
+            htmlOutput("multivarie")),
+    tabItem(tabName = "package_car",
+            htmlOutput("pacakge_car"))
   ))
 ))

@@ -8,7 +8,7 @@ output:
 
 ```{r setup, include=FALSE}
 # Configuration locale du chemin du projet SIWIM :
-knitr::opts_knit$set(root.dir = normalizePath("C:/Users/schmidt/Documents/GitHub/SiWIM-project/")) 
+knitr::opts_knit$set(root.dir = normalizePath("C:/Users/franz/GitHub/SiWIM-project/")) 
 options(encoding = 'UTF-8')
 ```
 
@@ -24,6 +24,10 @@ Cependant, les valeurs aberrantes ne sont pas forcément erronées.  Parfois, el
 #                  dependencies = TRUE)
 # install.packages("ggplot2")
 # install.packages("rmarkdown")
+# install.packages("devtools")
+# install.packages("knitr")
+
+devtools::install_github('rstudio/htmltools')
 
 devtools::install_github('rstudio/htmltools')
 
@@ -32,6 +36,8 @@ library(caret)
 library(ggplot2)
 library(dplyr)
 library(rmarkdown)
+require(htmltools)
+library(knitr)
 
 don <- read.csv('2_Data/2_Retraitees/SiWIM_data_after_input_clusters.csv',header=T)
 dim(don)

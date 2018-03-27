@@ -9,7 +9,7 @@ html_document:
 
 ```{r 'setup', echo = FALSE, cache=FALSE}
 # Configuration locale du chemin du projet SIWIM :
-knitr::opts_knit$set(root.dir = normalizePath("C:/Users/schmidt/Documents/GitHub/SiWIM-project/")) 
+knitr::opts_knit$set(root.dir = normalizePath("C:/Users/franz/GitHub/SiWIM-project/")) 
 options(encoding = 'UTF-8')
 ```
 
@@ -26,10 +26,20 @@ Le package car apporte des fonctions pour rechercher directement les outliers, e
 # install.packages("ggplot2")
 # install.packages("rmarkdown")
 
+<<<<<<< HEAD
+library(data.table)
+library(caret)
+=======
 devtools::install_github('rstudio/htmltools')
 
+>>>>>>> c37637871bcf2cf80a3b8a36f420c6ff266ff3d3
 library(ggplot2)
+library(dplyr)
 library(rmarkdown)
+<<<<<<< HEAD
+require(htmltools)
+=======
+>>>>>>> c37637871bcf2cf80a3b8a36f420c6ff266ff3d3
 library(knitr)
 
 don <- read.csv('2_Data/2_Retraitees/SiWIM_data_after_input_clusters.csv',header=T)
