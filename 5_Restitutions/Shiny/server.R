@@ -12,7 +12,12 @@ shinyServer(function(input, output, session) {
   #print(getwd())
   output$introHTML <-
     renderUI({
-      includeHTML("5_Restitutions/Shiny/html/explic.html")
+      withMathJax(includeHTML("5_Restitutions/Shiny/html/explic.html"),"MathJax.Hub.Config({HTML-CSS: {scale: 200%}});")
+    })
+  
+  output$web_scrap <-
+    renderUI({
+      includeHTML("5_Restitutions/Shiny/html/Web_scraping.html")
     })
   
   output$data_desc <-
@@ -29,7 +34,8 @@ shinyServer(function(input, output, session) {
   
   output$approachHTML <-
     renderUI({
-      includeHTML("5_Restitutions/Shiny/html/General_approach.html")
+      withMathJax(includeHTML("5_Restitutions/Shiny/html/General_approach.html"),
+                  "MathJax.Hub.Config({HTML-CSS: {scale: 200%}});")
     })
   
   SIWIM_data <- reactive({

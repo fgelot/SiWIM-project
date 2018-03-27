@@ -62,9 +62,15 @@ shinyUI(dashboardPage(
     )
   ),
   
-  dashboardBody(tabItems(
+  dashboardBody(
+  #   tags$div(
+  #   tags$script("MathJax.Hub.Config({HTML-CSS: {minScaleAdjust: 200%}});")
+  # ),
+    tabItems(
     tabItem(tabName = "Introduction",
             htmlOutput("introHTML")),
+    tabItem(tabName = "Web_scrap",
+            htmlOutput("web_scrap")),
     tabItem(tabName = "Data_analysis",
             htmlOutput("data_desc")),
     tabItem(tabName = "ACP_Clustering",
