@@ -422,7 +422,7 @@ shinyServer(function(input, output, session) {
                 SIWIM_data_test()[, c("Count"), with = FALSE]),
       order.by = as.POSIXct(SIWIM_data_test()$time_step)
     ),
-    main = "Réel vs prédictions pour l'apprentissage") %>%
+    main = "Réel vs prédictions pour la validation") %>%
       dyOptions(drawGrid = input$showgridTest) %>%
       dyRangeSelector(
         dateWindow = c(dyStartTestDate(),
