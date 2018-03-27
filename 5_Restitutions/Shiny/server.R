@@ -429,18 +429,18 @@ shinyServer(function(input, output, session) {
   
   output$univarie <-
     renderUI({
-      includeHTML("5_Restitutions/Shiny/html/.html")
+      includeHTML("5_Restitutions/Shiny/html/Outliers_univarie.html")
     })
   
   
   output$multivarie <-
     renderUI({
-      includeHTML("5_Restitutions/Shiny/html/.html")
+      includeHTML("5_Restitutions/Shiny/html/Outliers_multivarie.html")
     })
   
   output$pacakge_car <-
     renderUI({
-      includeHTML("5_Restitutions/Shiny/html/.html")
+      includeHTML("5_Restitutions/Shiny/html/Outliers_car.html")
     })
   
 })

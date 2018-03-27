@@ -202,6 +202,14 @@ shinyUI(dashboardPage(
               box(#Dygraph des données
                 dygraphOutput("graph_data_test"), width = 12)
             )
-            )
+            ), 
+    # tabItem(tabName = "Anomalies",
+    #         ),
+    tabItem(tabName = "univarie",
+            htmlOutput("univarie")),
+    tabItem(tabName = "multivarie",
+            htmlOutput("multivarie")),
+    tabItem(tabName = "package_car",
+            htmlOutput("pacakge_car"))
   ))
 ))
