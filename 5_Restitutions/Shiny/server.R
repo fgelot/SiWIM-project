@@ -433,6 +433,14 @@ shinyServer(function(input, output, session) {
   
   ## Anomalies
   
+  output$figures_anomalies <- output$Image <- renderImage({
+    
+    filename <- normalizePath(file.path('5_Restitutions/Shiny/img',
+                                        paste('outliers', input$type_anomalies, '.png', sep='')))
+    list(src = filename)
+    
+  }, deleteFile = FALSE)
+  
   output$univarie <-
     renderUI({
       includeHTML("5_Restitutions/Shiny/html/Outliers_univarie.html")

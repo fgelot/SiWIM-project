@@ -12,23 +12,23 @@ library(dplyr)
 
 setwd("~/GitHub/SiWIM-project/4_Scripts/3_Descriptive  Analysis")
 
-don <- read.csv('../../2_Data/2_Retraitees/SiWIM_data_after_input_clusters.csv',header=T)
-dim(don)
+donOutliers <- read.csv('../../2_Data/2_Retraitees/SiWIM_data_after_input_clusters.csv',header=T)
+dim(donOutliers)
 
-names(don)
+names(donOutliers)
 
 # Anomalies/outliers en termes de poids et dimensions
 # Donc etape 1: creation de la table correspondante
 
-don <- don[,c("Warning_flags","A1","A2","A3","A4","A5","A6","A7",
+donOutliers <- donOutliers[,c("Warning_flags","A1","A2","A3","A4","A5","A6","A7",
                       "M1","M2","M3","M4","M5","M6","M7","M8","N", 
                       "Reduced_chi_squared", "Vitesse", "MGV", "clusters_kmeans")]
 
-dim(don)
+dim(donOutliers)
 
 is.nan.data.frame <- function(x)
   do.call(cbind, lapply(x, is.nan))
-don[is.nan.data.frame(don)] <- 0
+donOutliers[is.nan.data.frame(donOutliers)] <- 0
 
 # Approche univariee: poids total 
 # en dehors de 1.5 IQR, avec IQR: Inter Quartile Range: difference entre 75th et 25th quantiles
@@ -39,8 +39,8 @@ don[is.nan.data.frame(don)] <- 0
 # conf	the lower and upper extremes of the 'notch' (if(do.conf)). See the details.
 # out	the values of any data points which lie beyond the extremes of the whiskers (if(do.out)).
 
-outlier_values <- boxplot.stats(don$MGV)$out
-boxplot(don$MGV, main="Poids total", boxwex=0.1)
+outlier_values <- boxplot.stats(donOutliers$MGV)$out
+boxplot(donOutliers$MGV, main="Poids total", boxwex=0.1)
 length(outlier_values) # 142 outliers
 
 #function that takes in vector of data and a coefficient,
@@ -54,44 +54,44 @@ check_outlier <- function(v, coef=1.5){
 
 #apply to our data
 
-don$outlier <- check_outlier(don$MGV)
+donOutliers$outlier <- check_outlier(donOutliers$MGV)
 
-write.csv(don, file = "../../2_Data/2_Retraitees/SiWIM_data_after_input_clusters_outliers.csv")
+write.csv(donOutliers, file = "../../2_Data/2_Retraitees/SiWIM_data_after_input_clusters_outliers.csv")
 
-ggplot(don,aes(x=MGV,y=Reduced_chi_squared, colour=outlier))+
+ggplot(donOutliers,aes(x=MGV,y=Reduced_chi_squared, colour=outlier))+
   geom_boxplot()+
   geom_text(aes(label=Warning_flags),hjust=-0.3)
 
-ggplot(don,aes(x=outlier,y=Reduced_chi_squared, colour=Warning_flags))+
+ggplot(donOutliers,aes(x=outlier,y=Reduced_chi_squared, colour=Warning_flags))+
    geom_boxplot()
 
-ggplot(don, aes(y=Warning_flags, x=Reduced_chi_squared, group=outlier)) +
+ggplot(donOutliers, aes(y=Warning_flags, x=Reduced_chi_squared, group=outlier)) +
   geom_point(aes(shape=outlier, color=outlier))
 
 # Idem pour le poids sur essieu 2
 
-don$outlier <- check_outlier(don$M2)
-ggplot(don, aes(y=Warning_flags, x=Reduced_chi_squared, group=outlier)) +
+donOutliers$outlier <- check_outlier(donOutliers$M2)
+ggplot(donOutliers, aes(y=Warning_flags, x=Reduced_chi_squared, group=outlier)) +
   geom_point(aes(shape=outlier, color=outlier))
 
 # Idem pour la vitesse
 
-don$outlier <- check_outlier(don$Vitesse)
-ggplot(don, aes(y=Warning_flags, x=Reduced_chi_squared, group=outlier)) +
+donOutliers$outlier <- check_outlier(donOutliers$Vitesse)
+ggplot(donOutliers, aes(y=Warning_flags, x=Reduced_chi_squared, group=outlier)) +
   geom_point(aes(shape=outlier, color=outlier))
 
 
 # Approche multivariee:
 
-# recherche d'un modèle 
-# puis: les observations avec une distance de Cook > 4 sont considérés come influents
-# outliers: éléments avec distance de Cook > 4 fois la distance moyenne
+# recherche d'un mod?le 
+# puis: les observations avec une distance de Cook > 4 sont consid?r?s come influents
+# outliers: ?l?ments avec distance de Cook > 4 fois la distance moyenne
 
-# Recherche du "meilleur" modèle
+# Recherche du "meilleur" mod?le
 
 ptm <- proc.time()
 
-train <- don[1:1000,c("A1","A2","A3","A4","A5","A6","A7",
+train <- donOutliers[1:1000,c("A1","A2","A3","A4","A5","A6","A7",
                  "M1","M2","M3","M4","M5","M6","M7","M8","N", 
                  "Vitesse", "MGV", "Reduced_chi_squared")]
 
@@ -172,8 +172,8 @@ print(CPU_time)
 
 # Avec glm et les donnees entieres
 
-don <- read.csv('../../2_Data/2_Retraitees/SiWIM_data_after_input_clusters.csv',header=T)
-train <- don[,c("Warning_flags","A1","A2","A3","A4","A5","A6","A7",
+donOutliers <- read.csv('../../2_Data/2_Retraitees/SiWIM_data_after_input_clusters.csv',header=T)
+train <- donOutliers[,c("Warning_flags","A1","A2","A3","A4","A5","A6","A7",
                       "M1","M2","M3","M4","M5","M6","M7","M8","N", 
                       "Vitesse", "MGV", "Reduced_chi_squared")]
 
@@ -199,12 +199,12 @@ train[influential,"outlier"] <- "TRUE"
 ggplot(train, aes(y=Warning_flags, x=Reduced_chi_squared, group=outlier)) +
   geom_point(aes(shape=outlier, color=outlier))
 
-# Avec les résidus
+# Avec les r?sidus
 
 resid_glm <- tail(resid(model_glm_glm),n=1000)
 
 plot(resid_glm, pch="*", cex=2, 
-     main="Observations influentes, avec les résidus") 
+     main="Observations influentes, avec les r?sidus") 
 
 influential <- as.numeric(names(resid_glm)) # Lignes influentes
 head(train[influential, ])
@@ -236,7 +236,7 @@ ggplot(train, aes(y=Warning_flags, x=Reduced_chi_squared, group=outlier)) +
 r_stud <- tail(rstudent(model_glm_glm),n=1000)
 
 plot(r_stud, pch="*", cex=2, 
-     main="Observations influentes, avec les résidus") 
+     main="Observations influentes, avec les r?sidus") 
 
 influential <- as.numeric(names(r_stud)) # Lignes influentes
 head(train[influential, ])

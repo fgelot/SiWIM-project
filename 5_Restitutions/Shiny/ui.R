@@ -209,8 +209,27 @@ shinyUI(dashboardPage(
                 dygraphOutput("graph_data_test"), width = 12)
             )
             ), 
-    # tabItem(tabName = "Anomalies",
-    #         ),
+     tabItem(tabName = "Anomalies",
+              fluidRow(
+                
+      # Choix de la méthode pour anomalies
+      radioButtons(
+        inputId = "type_anomalies",
+        label = "Sélectionner la méthode de calcul des anomalies : ",
+        selected = 1,
+        choices = c("Poids total, approche univariée" = 1, 
+                    "Vitesse, approche univariée" = 2, 
+                    "Essieu 2, approche univariée" = 3, 
+                    "Avec les résidus, approche multivariée" = 4, 
+                    "Avec la distance de Cook, approche multivariée" = 5, 
+                    "Avecles valeurs hat,approche multivariée" = 6, 
+                    "Avec les r-student, approche multivariée" = 7)
+      ),
+    box(# affichage des figures
+      imageOutput("figures_anomalies"),
+      # ligne horizontale
+      width = 6)
+    )),
     tabItem(tabName = "univarie",
             htmlOutput("univarie")),
     tabItem(tabName = "multivarie",
