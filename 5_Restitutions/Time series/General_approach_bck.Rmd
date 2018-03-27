@@ -406,9 +406,32 @@ adf.test(siwim_data_hours$Count, k = 168)
 
 Le nombre de différences requises pour que la série soit stationnaire est de $`r ndiffs(X)`$
 
-## 3.3 Tests de différents modèles ARIMA
+## 3.3 Analyse des autocorrélations et autocorrélations partielles
 
-### 3.3.1 ARIMA autoregressif d'ordre 1
+La fonction d'autocorrelation (ACF) mesure la correlation entre la série temporelle et elle-même décalée dans le temps (lags t-1, t-2, etc.). Par exemple, pour le lag d'ordre 5, ACF compare la série temporelle à l'instant t avec la série temporelle à l'instant t-5.
+
+Pour une série de type moyenne mobile de lag n, il n'y aura aucune corrélation entre $x(t)$ et $x(t-n-1)$. Donc, le graphique d'autocorrélation passe en dessous d'une certaine valeur au $n^{ème}$ lag. De cette manière, on trouve l'ordre idéal pour une série de type MA (Moving average). 
+
+
+```{r "ACF", echo=FALSE, strip.white=FALSE}
+acf(X)
+```
+
+La fonction d'autocorrélation partielle mesure la corrélation entre une série temporelle et elle-même décalée dans le temps, après avoir éliminé les varaitions déjà expliquées par les comparaisons intermédiaires (dus aux lags précédents). PAr exemple, pour le lag d'ordre 5, elle va comparer la corrélation avec l'instant t, mais elle supprime les effets adèjà expliqués par les lags 1 à 4.
+
+A l'instar du graphique ACF, PACF passera en dessous d'une certaine valeur après un certain lag qui donne l'ordre d'une série de type AR (auto-regressive). Par exemple, si on prendre une série AR d'ordre 1 et si on exclut l'effet du lag d'ordre 1 ($x(t-1)$), le lag d'ordre 2 ($x(t-2)$)  est indépendant de $x(t)$. Donc la fonction d'autocorrélation partielle diminuera rapidement après le lag d'ordre 1.
+
+```{r "PACF", echo=FALSE, strip.white=FALSE}
+pacf(X)
+```
+On peut constater que le graphique ACF nous indique un ordre MA de 8 et le graphique PACF nous indique un ordre AR de 1.
+
+$p = 1$ et $q = 8$
+
+
+## 3.4 Tests de différents modèles ARIMA
+
+### 3.4.1 ARIMA autoregressif d'ordre 1
 
 ```{r "ARIMA AR", echo=FALSE, warning=FALSE}
 # AR model 
@@ -447,7 +470,7 @@ p1a
 
 ```
 
-### 3.3.2 ARIMA moyenne mobile d'ordre 1
+### 3.4.2 ARIMA moyenne mobile d'ordre 1
 
 ```{r "ARIMA MA", echo=FALSE, warning=FALSE}
 # MA model
@@ -486,7 +509,47 @@ p2a
 </br>
 </br>
 
-### 3.3.3 ARIMA auto
+### 3.4.3 ARIMA autoregressif d'ordre 1 et moyenne mobile d'ordre 8
+
+
+```{r "ARIMA ARMA", echo=FALSE, warning=FALSE}
+
+# Composite model
+model_ARMA <- arima(yt, order = c(1,0,8))
+# accuracy(model_ARMA)
+
+#autoplot(forecast(model_ARMA, 168))
+
+pd_ARMA <- funggcast(x3, forecast(model_ARMA, h = f_win))
+
+p3a<-ggplot(data=pd_ARMA,aes(x=date,y=observed)) 
+p3a<- p3a + geom_line(aes(color = "1"))
+p3a<- p3a + geom_line(aes(y = fitted,color="2")) 
+p3a<- p3a + geom_line(aes(y = forecast,color="3"))
+p3a<- p3a + scale_colour_manual(values=c("red", "blue","black"),labels = c("Observed", "Fitted", "Forecasted"),name="Data")
+p3a<- p3a + geom_ribbon(aes(ymin=lo95,ymax=hi95),alpha=.25)
+# p1a<-p1a+scale_x_datetime(name='',breaks=date_breaks('8 hours'),minor_breaks= date_breaks('1 hour'),labels=date_format("%Y-%m-%d %H"),expand=c(0,0))
+p3a<-p3a+scale_y_continuous(name='Fréquence')
+p3a <- p3a + labs(title='Frequence des camions - ARIMA ARMA (Intervalle de confiance à 95%)')
+p3a<-p3a+theme(axis.text.x=element_text(size=10))
+
+p3a
+
+# dygraph(xts(x=pd_ARMA[,-c(1,5,6)], order.by = pd_ARMA[,1]), "Frequence des camions - ARIMA ARMA") %>%
+#   dySeries("observed", label = "Real") %>%
+#   dySeries("fitted", label = "Fitted") %>%
+#   dySeries(c("lo95", "forecast", "hi95"), label = "Predicted") %>%
+#   dyRangeSelector()
+
+# autoplot(model_ARMA$residuals)
+# autoplot(acf(model_ARMA$residuals))
+# autoplot(pacf(model_ARMA$residuals))
+
+```
+</br>
+</br>
+
+### 3.4.4 ARIMA auto
 
 ```{r "auto ARIMA", echo=FALSE, warning=FALSE}
 
@@ -525,7 +588,7 @@ p4a
 </br>
 </br>
 
-### 3.3.4 ARIMA avec une saisonnalité (24 heures)
+### 3.4.5 ARIMA avec une saisonnalité (24 heures)
 
 ```{r "ARIMA season", echo=FALSE, warning=FALSE}
 
@@ -569,7 +632,7 @@ p5a
 </br>
 </br>
 
-### 3.3.5 ARIMA avec double saisonnalité (24 heures et 7 jours)
+### 3.4.6 ARIMA avec double saisonnalité (24 heures et 7 jours)
 
 ```{r "ARIMA double seasons", echo=FALSE, warning=FALSE}
 
@@ -615,7 +678,7 @@ autoplot(forecast(model_auto_ARMA_double, f_win))
 </br>
 </br>
 
-### 3.3.6 Résultats des erreurs par modèle ARIMA
+### 3.4.7 Résultats des erreurs par modèle ARIMA
 
 Voici les différents types d'erreurs présentées pour comparer les modèles :
 
@@ -630,6 +693,7 @@ Voici les différents types d'erreurs présentées pour comparer les modèles :
 ```{r "Results ARIMA", echo = FALSE}
 rbind.data.frame("Modèle AR" = accuracy(model_AR),
 "Modèle MA" = accuracy(model_MA),
+"Modèle ARMA" = accuracy(model_ARMA),
 "Modèle auto ARIMA" = accuracy(model_auto_ARMA),
 "Modèle ARIMA avec saison" = accuracy(model_auto_ARMA_seas),
 "Modèle ARIMA avec double saison" = accuracy(model_auto_ARMA_double))  %>% kable()
@@ -637,9 +701,9 @@ rbind.data.frame("Modèle AR" = accuracy(model_AR),
 </br>
 </br>
 
-## 3.4 Holt winters ou lissage exponentiel
+## 3.5 Holt winters ou lissage exponentiel
 
-### 3.4.1 Lissage exponentiel simple
+### 3.5.1 Lissage exponentiel simple
 
 Le lissage exponentiel simple consiste à donner plus d’importance aux dernières observations. On ne prolonge pas une série comme on le ferait avec une régression simple mais on cherche à obtenir une valeur lissée en t pour la reporter tout simplement en t + 1.
 La formule est la suivante :
@@ -693,7 +757,7 @@ p1h
 </br>
 </br>
 
-### 3.4.2 Lissage exponentiel triple ou Holt Winters
+### 3.5.2 Lissage exponentiel triple ou Holt Winters
 
 Le lissage Holt Winters consiste à rajouter 2 coefficients supplémentaires : $\gamma$ pour la tendance et $\delta$ pour la saisonnalité.
 
@@ -733,7 +797,7 @@ p2h
 </br>
 </br>
 
-### 3.4.3 Résultats des modèles de lissage exponentiel
+### 3.5.3 Résultats des modèles de lissage exponentiel
 
 ```{r echo=FALSE}
 rbind.data.frame("Sipmle Expoential Smoothing" = accuracy(forecast(siwim_data_hw_ses, h = f_win)), "Expoential Smoothing" =
