@@ -58,7 +58,13 @@ shinyUI(dashboardPage(
         tabName = "Anomalies",
         icon = icon("truck"),
         startExpanded = TRUE
-      )
+      ),
+      menuSubItem("Anomalies avec approche univariée",
+                  tabName = "univarie"),
+      menuSubItem("Anomalies avec approche multivariée",
+                  tabName = "multivarie"),
+      menuSubItem("Anomalies avec package car",
+                  tabName = "package_car")
     )
   ),
   

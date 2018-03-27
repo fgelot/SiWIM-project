@@ -425,4 +425,22 @@ shinyServer(function(input, output, session) {
       )
   })
   
+  ## Anomalies
+  
+  output$univarie <-
+    renderUI({
+      includeHTML("5_Restitutions/Shiny/html/.html")
+    })
+  
+  
+  output$multivarie <-
+    renderUI({
+      includeHTML("5_Restitutions/Shiny/html/.html")
+    })
+  
+  output$pacakge_car <-
+    renderUI({
+      includeHTML("5_Restitutions/Shiny/html/.html")
+    })
+  
 })
