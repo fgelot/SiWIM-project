@@ -220,15 +220,13 @@ shinyUI(dashboardPage(
         choices = c("Poids total, approche univariée" = 1, 
                     "Vitesse, approche univariée" = 2, 
                     "Essieu 2, approche univariée" = 3, 
-                    "Avec les résidus, approche multivariée" = 4, 
-                    "Avec la distance de Cook, approche multivariée" = 5, 
-                    "Avecles valeurs hat,approche multivariée" = 6, 
-                    "Avec les r-student, approche multivariée" = 7)
+                    "Distance de Cook, approche multivariée" = 5,
+                    "Résidus, approche multivariée" = 4, 
+                    "Hat values,approche multivariée" = 6, 
+                    "Valeurs r-student, approche multivariée" = 7)
       ),
     box(# affichage des figures
-      imageOutput("figures_anomalies"),
-      # ligne horizontale
-      width = 6)
+      imageOutput("figures_anomalies"), width=12)
     )),
     tabItem(tabName = "univarie",
             htmlOutput("univarie")),
