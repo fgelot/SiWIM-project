@@ -6,17 +6,18 @@ output:
     toc: yes
 ---
 
-```{r setup, include=FALSE}
+```{r, include=FALSE, echo=FALSE, warning = FALSE}
 # Configuration locale du chemin du projet SIWIM :
-knitr::opts_knit$set(root.dir = normalizePath("C:/Users/franz/GitHub/SiWIM-project/")) 
-options(encoding = 'UTF-8')
+knitr::opts_knit$set(root.dir = normalizePath("C:/Users/schmidt/Documents/GitHub/SiWIM-project/")) 
+knitr::opts_chunk$set(warning = FALSE, echo = FALSE)
+#knitr::opts_knit$set(root.dir = normalizePath("C:/Users/franz/GitHub/SiWIM-project/")) 
 ```
 
 Les valeurs aberrantes peuvent survenir pour diverses raisons, dont la plus évidente est lors d’erreurs de mesure, erreurs de transcription des données, etc.
 
 Cependant, les valeurs aberrantes ne sont pas forcément erronées.  Parfois, elles sont des valeurs qui révèlent un phénomène particulier qui peut être différent du modèle suivi par la majorité des observations.
 
-```{r}
+```{r include=FALSE}
 # install.packages("data.table")
 # install.packages("dplyr")
 # install.packages("caret",
@@ -27,9 +28,7 @@ Cependant, les valeurs aberrantes ne sont pas forcément erronées.  Parfois, el
 # install.packages("devtools")
 # install.packages("knitr")
 
-devtools::install_github('rstudio/htmltools')
-
-devtools::install_github('rstudio/htmltools')
+#devtools::install_github('rstudio/htmltools')
 
 library(data.table)
 library(caret)
@@ -38,16 +37,19 @@ library(dplyr)
 library(rmarkdown)
 require(htmltools)
 library(knitr)
-
+```
+```{r}
 don <- read.csv('2_Data/2_Retraitees/SiWIM_data_after_input_clusters.csv',header=T)
 dim(don)
 
 names(don)
 ```
 
+
 # Méthodologie
 
 Les variables en notre possession sont: 
+
 + Des paramètres physiques du véhicule: poids total, poids sur essieux, distances entre essieux, 
 + Des variables d'environnement: date et heure de passage, température, 
 + Des variables liées au passage du véhicule: vitesse, voie de passage, 
@@ -84,6 +86,7 @@ Un outlier est un individu dont la variable étudiée est en dehors de 1.5*IQR, 
 Cette recherche de outliers peut se faire en univariée à l'aide de bowplot. 
 
 Les sorties de la fonction boxplot sont: 
+
 + stats: vecteur de longueur 5, qui contient la valeur extrême de la moustache inférieure, la charnière inférieure, la médiane, la charbnière supérieure et la valeur extrême de la moustache supérieure. 
 + n: le nombre d'observations NA dans l'échantillon.	
 + conf: les valeurs inférieures et supérieures du ‘notch’ (if(do.conf)). 
