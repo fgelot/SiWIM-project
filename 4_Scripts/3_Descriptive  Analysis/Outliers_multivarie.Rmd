@@ -8,13 +8,14 @@ output:
 ---
 
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, echo=FALSE, warning=FALSE}
 # Configuration locale du chemin du projet SIWIM :
-knitr::opts_knit$set(root.dir = normalizePath("C:/Users/franz/GitHub/SiWIM-project/")) 
-options(encoding = 'UTF-8')
+#knitr::opts_knit$set(root.dir = normalizePath("C:/Users/franz/GitHub/SiWIM-project/")) 
+knitr::opts_chunk$set(warning = FALSE, echo = FALSE)
+knitr::opts_knit$set(root.dir = normalizePath("C:/Users/schmidt/Documents/GitHub/SiWIM-project/")) 
 ```
 
-```{r}
+```{r, include=FALSE}
 library(data.table)
 library(caret)
 library(ggplot2)
@@ -22,7 +23,8 @@ library(dplyr)
 library(rmarkdown)
 require(htmltools)
 library(knitr)
-
+```
+```{r}
 don <- read.csv('2_Data/2_Retraitees/SiWIM_data_after_input_clusters.csv',header=T)
 dim(don)
 
@@ -108,9 +110,12 @@ Les modèles recherchés sont le modèle linéaire généralisé, celui avec pé
 
 ## Modèle linéaire généralisé
 
-```{r}
+```{r, include=FALSE}
 model_glm<-train(trainSet[,predictors],trainSet[,outcomeName],method='gbm',trControl=fitControl,tuneLength=10)
-print(model_glm)
+#print(model_glm)
+```
+
+```{r}
 plot(model_glm)
 ```
 
@@ -119,25 +124,29 @@ plot(model_glm)
 ```{r}
 model_rqlasso<-train(trainSet[,predictors],trainSet[,outcomeName],method='rqlasso',
                      ,trControl=fitControl,tuneLength=10)
-print(model_rqlasso)
+#print(model_rqlasso)
 plot(model_rqlasso)
 ```
 
 ## Forêts aléatoires
 
-```{r}
+```{r, include=FALSE}
 model_rf<-train(trainSet[,predictors],trainSet[,outcomeName],method='rf',
                 ,trControl=fitControl,tuneLength=10) # random Forest
-print(model_rf)
+#print(model_rf)
+```
+```{r}
 plot(model_rf)
 ```
 
 ## Gradient boosting
 
-```{r}
+```{r, include=FALSE}
 model_gbm<-train(trainSet[,predictors],trainSet[,outcomeName],method='gbm',
                  ,trControl=fitControl,tuneLength=10) #Stochastic Gradient Boosting
-print(model_gbm)
+#print(model_gbm)
+```
+```{r}
 plot(model_gbm)
 ```
 
